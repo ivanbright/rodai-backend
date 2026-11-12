@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools==75.8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rodai-backend"
+version = "0.1.0"
+description = "Local-first road perception research platform"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.115.8",
+  "uvicorn[standard]==0.34.0",
+  "pydantic-settings==2.7.1",
+  "sqlalchemy==2.0.38",
+  "psycopg[binary]==3.2.4",
+  "alembic==1.14.1",
+  "PyYAML==6.0.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.3.4",
+  "httpx==0.28.1",
+  "ruff==0.9.6",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rodai*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
