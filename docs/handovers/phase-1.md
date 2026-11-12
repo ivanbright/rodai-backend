@@ -12,8 +12,8 @@ Status: **In progress; acceptance criteria unmet.** User authorized project star
 - React/TypeScript/Vite status viewer; backend-disconnected state is explicit and no AI output is fabricated.
 - Multi-stage Dockerfile, Docker Compose for backend/frontend/PostgreSQL, `.dockerignore`, `.gitignore`, `.env.example`, PowerShell run/test scripts.
 - Setup, Docker, deployment, security, privacy and preliminary licence documentation.
-- Initialized a Git repository. Git status/staging could not be completed because Git rejected the workspace ownership as dubious; current user is `IVANBRIGHT/CodexSandboxOffline`, repository owner is `IVANBRIGHT/Bright`.
-- Added a separate frontend repository at `IvanBright/Rodai-frontend`; initial checkpoint `b088ba7` was pushed to GitHub's canonical `ivanbright/rodai-frontend` remote. Root repository is intended to reference it as a submodule.
+- Initialized the integrated/backend repository and committed checkpoint `6a5e605` (`feat(backend): add RodAI foundation and deployment scaffold`). Frontend is a Git submodule.
+- Added a separate frontend repository at `IvanBright/Rodai-frontend`; initial checkpoint `b088ba7` was pushed to GitHub's canonical `ivanbright/rodai-frontend` remote.
 
 ## Dependencies
 
@@ -24,9 +24,9 @@ Pinned candidates: FastAPI 0.115.8, Uvicorn 0.34.0, Pydantic Settings 2.7.1, SQL
 - `python -m compileall -q .\backend\rodai .\backend\migrations .\backend\tests` → exit code 0.
 - `docker ps` → `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine ... The system cannot find the file specified.` Docker Desktop daemon is not running/reachable.
 - `npm.cmd install --package-lock-only --ignore-scripts --no-audit --no-fund` produced no output for over a minute and was interrupted. Offline retry returned `npm error code ENOTCACHED` for `@testing-library/react`; no package lock was generated.
-- `git init` → initialized the root repository. Initial status required a workspace-scoped `safe.directory` setting because Git reported different sandbox/repository owners.
+- `git init` → initialized the root repository. Git operations required a workspace-scoped `safe.directory` setting because Git reported different sandbox/repository owners.
 - Frontend `git init`, commit `b088ba7` (`chore(frontend): add RodAI foundation viewer`), origin configuration and push all succeeded. GitHub redirected the mixed-case URL to `https://github.com/ivanbright/rodai-frontend.git`.
-- Backend remote check for `https://github.com/IvanBright/Rodai.git` returned `Repository not found`; it may be private or the repository URL/name may differ. No backend remote was added and no backend commit was pushed yet.
+- Backend `origin` is configured as `https://github.com/IvanBright/Rodai.git`. `git ls-remote` returned `Repository not found`; it may be private or the repository URL/name may differ. No backend push was attempted.
 - No Compose build, service start, Alembic migration, automated test, frontend build, lint, or image-size inspection ran.
 
 ## What works / not established
@@ -40,7 +40,7 @@ Python files are syntactically compilable. Actual startup, database connectivity
 - Docker base tags are pinned but digests are not recorded.
 - No authentication is implemented; this foundation must not be exposed publicly. Authentication and Railway deployment belong to Phase 1B.
 - No Docker build/run/test results exist, so Phase 1 acceptance criteria are unmet and this phase is not complete.
-- Root/backend repo still needs its commit and verified origin. Frontend initial commit is pushed but the generated package lock is still pending.
+- Root/backend commit is local only until the backend remote is reachable. Frontend commit is pushed, but the generated package lock is still pending.
 
 ## Decisions needed / recommended next step
 

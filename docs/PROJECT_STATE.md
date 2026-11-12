@@ -18,7 +18,7 @@ Updated: 2026-11-12
 - No `docs/`, supplied videos, or design references existed before Phase 0 documentation was created.
 - Addendum `rodai-docker-railway-addendum.md` requires container-first local and Railway packaging, PostgreSQL, CPU-only production, environment-based config and authentication on public deployment.
 - Owner's “total consent to start” was treated as authorization to begin Phase 0 and Phase 1; Phase 1 remains incomplete.
-- Git layout: root/integrated backend repository with `frontend/` as the separately versioned `Rodai-frontend` submodule; frontend checkpoint `b088ba7` was pushed successfully. Backend remote is unresolved.
+- Git layout: root/integrated backend repository with `frontend/` as the separately versioned `Rodai-frontend` submodule; frontend checkpoint `b088ba7` was pushed successfully, integrated checkpoint `6a5e605` is local. Backend origin is configured but anonymous access reports not found, so it is not pushed.
 
 ## Not verified
 
