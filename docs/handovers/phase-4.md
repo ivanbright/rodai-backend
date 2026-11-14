@@ -1,7 +1,9 @@
-# RodAI Phase 4 Handover - Controlled Road Safety Lab
+# RodAI Phase 4 Handover - Scripted Demonstration (Not the Product Lab)
 
 Date: 2026-11-14  
-Status: **First interactive simulation slice implemented. This is a scripted scenario demonstration, not a learned or validated crash-prediction system.**
+Status: **A small scripted UI demonstration exists. Owner-provided visual references clarified that the intended lab must analyze real road video; this scripted work does not satisfy that goal and must not be represented as the core lab.**
+
+The real-video product direction and acceptance sequence now live in [PRODUCT_VISION.md](../PRODUCT_VISION.md). The screenshots supplied on 2026-11-14 are references, not evidence that their displayed analytics, sensors or integrations exist in RodAI.
 
 ## Available in the demo
 
@@ -23,25 +25,20 @@ The current scenarios are deterministic scripts with known paths and event times
 
 The first versioned manifest is `frontend/src/scenarios/road-conflicts.v1.json` (`rodai.scenario-library.v1`, library version `1.0.0`). It records three cases, scene layout, coordinate space and update rate, scripted actor identities/classes/roles/paths, time-to-conflict, conflict point, and expected outcomes with/without the simulated response. The UI renders each manifest scene and can pass those rendered frames through DETR. This is a small, hand-authored test bank; it has no randomized variants, photorealistic rendered camera frames, or persistent run records yet.
 
-Next expand it with following-distance and sudden-braking variants; pedestrian and cyclist crossings; uncontrolled and signalized intersections; turning conflicts; low-light, rain, occlusion and camera-placement variants; and safe non-conflict controls to measure false alarms. Add fixed random seeds for generated variants and record scenario/version, model/version, configuration, output events and metrics per run. Synthetic variants must remain marked synthetic and distinct from permissioned recorded footage.
+Earlier planning proposed additional scripted variants. That proposal is superseded as the next product step by the real-video roadmap in `PRODUCT_VISION.md`. Keep this demonstration isolated and clearly labeled if it remains in the UI; do not present additional scripted variants as progress toward the camera product.
 
-## Planned model and evaluation path
+## Earlier synthetic-data proposal (not the current product path)
 
-1. Generate or author repeatable scenes with complete ground truth.
-2. Render camera-like frames that do not reveal hidden labels to the perception pipeline.
-3. Feed image detections into tracking, estimate paths and speed, then calculate conflict warnings from the observed paths.
-4. Evaluate detections, track continuity, warning lead time, missed conflicts, false alerts per simulated hour, and intervention outcomes against ground truth.
-5. Keep train, tune and held-out scenario families separate; do not report training-scene results as independent validation.
-6. Later compare model or policy versions against the same library and publish run-level evidence.
+Synthetic scenarios can support repeatable software checks and may complement model development, but they are not the requested real-video lab and cannot establish performance on CCTV footage. Refer to `PRODUCT_VISION.md` for the active sequence and real-footage acceptance evidence.
 
-Scenario labels provide supervised examples; the model does not automatically train itself merely by watching scenarios. Any training set, weights and data sources need provenance/licence review before selection and use. Target-region acceptance still requires representative Rwanda/Kigali footage with documented rights.
+The model does not automatically train itself by watching video. Training data, weights and sources require provenance/licence review before selection and use. Target-region acceptance requires representative Rwanda/Kigali footage with documented rights.
 
-## Current scope and next acceptance gates
+## Current scope and limits
 
 - Delivered: three selectable animated scenes, a versioned scenario manifest, deterministic countdown, conflict warning, simulated braking toggle, optional live DETR inference on rendered frames with a separate detection overlay, impact/avoidance outcome, clear synthetic/rule-based disclosure, and a separate video-analysis tab.
-- Remaining for a richer lab: configurable scene builder, scenario persistence/run history, frame and ground-truth export, varied camera/weather/lighting/occlusion rendering, realistic agent dynamics, and evaluation dashboards.
-- Remaining perception work: connect rendered frames to the actual detector; tracking with stable IDs; trajectory estimation; event logic based on observed model output rather than hidden ground truth; reviewed alert thresholds; and measured false-positive/false-negative behavior.
-- A simulation result is not evidence of real-world accuracy. Benchmarks still require actual hardware and representative permissioned footage. No operational deployment or accident-prevention claim is authorized by this prototype.
+- This scripted simulation is not a required product milestone and should not be expanded as a substitute for real-video capabilities.
+- The relevant next work is real-video tracking, calibrated movement measurement, CCTV ingestion, auditable incident/conflict analysis, and evaluation against labeled, permissioned footage as specified in [PRODUCT_VISION.md](../PRODUCT_VISION.md).
+- A simulation result is not evidence of real-world accuracy. Benchmarks still require actual hardware and representative permissioned footage. No operational deployment or accident-prevention claim is supported by this prototype.
 
 ## Verification
 

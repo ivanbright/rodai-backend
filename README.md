@@ -1,12 +1,12 @@
 # RodAI
 
-RodAI is a local-first road perception and simulation laboratory. Its outputs are experimental and must not be used as the sole basis for safety-critical or enforcement decisions. It does not provide validated accident prediction or real-world crash prevention.
+RodAI is being built to analyze real road-camera video and provide road-safety information for human review. The current prototype detects a limited set of road-user objects in uploaded video. It does not yet track road users, estimate calibrated physical speeds, ingest CCTV streams, detect or predict accidents, or prevent crashes. Outputs are experimental and must not be used as the sole basis for safety-critical or enforcement decisions.
 
 ## Current status
 
-The local demo has two workspaces: a **Simulation lab** with three repeatable scripted road-conflict scenes, a rule-based risk countdown, simulated braking, and an optional live DETR pass on generated frames; and **Video analysis**, which runs the pinned CPU DETR object detector on uploaded video. The simulation is synthetic ground-truth logic, not a trained accident-prediction model. Its risk index ignores detector boxes; the video detector identifies common road-user objects but does not track them or predict accidents.
+The local demo includes **Video analysis**, which runs the pinned CPU DETR object detector on uploaded video. It can display detections alongside playback and return frame-level results. A separate scripted SVG simulation workspace is also present as a limited software demonstration; it is not real road footage, a validated model, or progress evidence for CCTV incident detection. See [the product vision and acceptance roadmap](docs/PRODUCT_VISION.md) and [Phase 3 evidence and limits](docs/handovers/phase-3.md).
 
-See [Phase 4](docs/handovers/phase-4.md) for the simulation-library direction and current limits, and [Phase 3](docs/handovers/phase-3.md) for detector evidence.
+See [Product Vision](docs/PRODUCT_VISION.md) for the intended real-video product, build sequence and measurable acceptance evidence. See [Phase 3](docs/handovers/phase-3.md) for detector evidence and [Phase 4](docs/handovers/phase-4.md) for the scripted demonstration's limits.
 
 ## Requirements
 

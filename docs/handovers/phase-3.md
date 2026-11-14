@@ -42,6 +42,6 @@ Then open `http://localhost:5173`, choose an MP4, MOV, MKV, WebM or AVI video, p
 - Face/plate blurring, tracking, event detection, model evaluation on a labeled target sample, deployment, authentication and product design from the owner?s references remain future work. Phase 5 design references must be reviewed before design implementation.
 - Model licensing notes are technical provenance, not a legal determination. See [MODEL_PROVENANCE.md](../MODEL_PROVENANCE.md).
 
-## Next step: simulation lab
+## Product direction after the owner visual references
 
-The first controlled-scenario lab is recorded in `phase-4.md`. It demonstrates scripted conflict scenarios and a rule-based intervention flow independently of camera detection. The lab is not accident-prediction model evidence.
+The owner's 2026-11-14 visual references establish real road-camera video analysis as the product direction. The scripted SVG demonstration in `phase-4.md` does not meet that requirement. See [PRODUCT_VISION.md](../PRODUCT_VISION.md) for the staged build and measurable acceptance criteria: tracking, calibrated movement measurement, CCTV ingestion, conflict/incident evaluation, and an operator dashboard. Representative permissioned footage and hardware benchmarks remain necessary before performance or target-region claims.
