@@ -21,17 +21,18 @@ The top-down map, satellite/GPS overlays, vehicle-assistance displays, photoreal
 
 ## Actual implementation today
 
-- A pinned CPU DETR model detects a limited set of road-user objects in uploaded video and in the browser-camera path. The upload workflow produces frame-level JSONL results and can display detection overlays during playback.
+- A pinned CPU DETR model detects a limited set of road-user objects in uploaded video and in the browser-camera path. The upload workflow produces frame-level JSONL results and displays tracked IDs and trails during playback.
+- A lightweight online tracker associates detections across nearby frames and estimates image-plane motion in pixels per second. It is a prototype association method; IDs can switch or split, and its pixel values are not calibrated vehicle speeds.
 - One local smoke clip completed inference. This demonstrates that the pipeline runs; it does not demonstrate accuracy, reliable speed estimates, object tracking, accident detection, collision prediction, CCTV streaming, or readiness for road deployment.
 - A scripted SVG simulation workspace exists. It is a demonstration of deterministic rules and is **not** the product's real-video lab, validation evidence, or a substitute for camera footage. Do not count it as progress toward operational incident detection.
-- The CCTV/RTSP ingest path, persistent multi-object tracking, calibrated speed measurement, learned or validated conflict/incident logic, operator alert workflow, and representative Kigali/Rwanda evaluation are not yet implemented or accepted.
+- The CCTV/RTSP ingest path, tracking validation, calibrated speed measurement, learned or validated conflict/incident logic, operator alert workflow, and representative Kigali/Rwanda evaluation are not yet implemented or accepted.
 
 ## Build sequence and acceptance evidence
 
 Each stage should use real recorded or live camera video where specified, retain source provenance, and report what was actually measured.
 
 1. **Reliable video foundation:** keep upload analysis usable, render the original video with model detections, expose processing progress/errors, and provide readable event/result views. Acceptance: supported-format fixtures process end to end and overlay timestamps align with source frames.
-2. **Road-user tracking:** connect detections over time and show stable track IDs and trajectories. Acceptance: evaluate detection precision/recall and tracking ID metrics on a reviewed, labeled, permissioned clip set; publish errors as well as successes.
+2. **Road-user tracking:** improve and validate the prototype association tracker. Acceptance: evaluate detection precision/recall and tracking metrics such as IDF1 and ID switches on a reviewed, labeled, permissioned clip set; publish errors as well as successes. Do not call IDs stable until those results support the claim.
 3. **Movement measurement:** count crossings and estimate direction/flow. Add per-camera calibration before displaying physical speed or distance. Acceptance: compare counts and speed against manually reviewed ground truth, report camera setup and uncertainty.
 4. **CCTV ingestion and live operator view:** add a configurable, secured camera stream path (for example RTSP where the camera supports it), reconnect and health states, bounded queues, and dropped-frame reporting. Acceptance: sustained run on identified hardware with measured latency, throughput, CPU/RAM, frame drops and recovery behaviour.
 5. **Conflict and incident alerts:** first implement transparent, auditable rules over tracked trajectories; distinguish collision/incident detection after an event from risk warnings before a possible event. Acceptance: evaluate against labeled positive and negative footage using warning lead time, missed events and false alerts per camera-hour. Do not call it prevention or predictive AI without evidence.

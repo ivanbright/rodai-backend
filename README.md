@@ -1,10 +1,10 @@
 # RodAI
 
-RodAI is being built to analyze real road-camera video and provide road-safety information for human review. The current prototype detects a limited set of road-user objects in uploaded video. It does not yet track road users, estimate calibrated physical speeds, ingest CCTV streams, detect or predict accidents, or prevent crashes. Outputs are experimental and must not be used as the sole basis for safety-critical or enforcement decisions.
+RodAI is being built to analyze real road-camera video and provide road-safety information for human review. The current prototype detects a limited set of road-user objects and applies short-term image-plane tracking to uploaded video. It does not yet ingest CCTV streams, estimate calibrated physical speeds, detect or predict accidents, or prevent crashes. Outputs are experimental and must not be used as the sole basis for safety-critical or enforcement decisions.
 
 ## Current status
 
-The local demo includes **Video analysis**, which runs the pinned CPU DETR object detector on uploaded video. It can display detections alongside playback and return frame-level results. A separate scripted SVG simulation workspace is also present as a limited software demonstration; it is not real road footage, a validated model, or progress evidence for CCTV incident detection. See [the product vision and acceptance roadmap](docs/PRODUCT_VISION.md) and [Phase 3 evidence and limits](docs/handovers/phase-3.md).
+The local demo includes **Video analysis**, which runs the pinned CPU DETR object detector and prototype tracker on uploaded video. Playback shows tracked IDs and image-plane trails; session results include frame-level detections and tracks. A separate scripted SVG simulation workspace is also present as a limited software demonstration; it is not real road footage, a validated model, or progress evidence for CCTV incident detection. See [the product vision and acceptance roadmap](docs/PRODUCT_VISION.md), [Phase 3 detector evidence](docs/handovers/phase-3.md), and [Phase 5 tracking implementation and limits](docs/handovers/phase-5.md).
 
 See [Product Vision](docs/PRODUCT_VISION.md) for the intended real-video product, build sequence and measurable acceptance evidence. See [Phase 3](docs/handovers/phase-3.md) for detector evidence and [Phase 4](docs/handovers/phase-4.md) for the scripted demonstration's limits.
 

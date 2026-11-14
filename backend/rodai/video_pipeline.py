@@ -11,6 +11,8 @@ from typing import Any
 
 import cv2
 
+from rodai.tracking import RoadObjectTracker
+
 
 class InvalidVideoError(ValueError):
     """The upload could not be opened and decoded as a video."""
@@ -57,6 +59,8 @@ def process_video(
 
         frame_id = 0
         stopped = False
+        tracker = RoadObjectTracker()
+        last_timestamp_ms: int | None = None
         while True:
             if should_continue is not None and not should_continue():
                 stopped = True
@@ -72,13 +76,18 @@ def process_video(
                 height = int(frame.shape[0])
 
             raw_timestamp = float(capture.get(cv2.CAP_PROP_POS_MSEC))
+            fallback_timestamp = round(frame_id / raw_fps * 1000) if raw_fps else None
             timestamp_ms = (
                 round(raw_timestamp)
                 if math.isfinite(raw_timestamp) and raw_timestamp >= 0
-                else round(frame_id / raw_fps * 1000)
-                if raw_fps
                 else None
             )
+            if timestamp_ms is None or (
+                last_timestamp_ms is not None and timestamp_ms <= last_timestamp_ms
+            ):
+                timestamp_ms = fallback_timestamp
+            if timestamp_ms is not None:
+                last_timestamp_ms = timestamp_ms
             if (
                 max_video_seconds
                 and timestamp_ms is not None
@@ -88,6 +97,11 @@ def process_video(
                     f"Video exceeds the {max_video_seconds} second duration limit."
                 )
             detections = detect_frame(frame) if detect_frame else []
+            tracks = (
+                tracker.update(detections, timestamp_ms=timestamp_ms, frame_id=frame_id)
+                if detect_frame
+                else []
+            )
             write_record(
                 {
                     "schema_version": "rodai.session.v1",
@@ -98,7 +112,7 @@ def process_video(
                     "width": width,
                     "height": height,
                     "detections": detections,
-                    "tracks": [],
+                    "tracks": tracks,
                     "inference": "complete" if detect_frame else "not-run",
                 }
             )

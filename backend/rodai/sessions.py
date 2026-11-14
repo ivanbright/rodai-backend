@@ -35,6 +35,7 @@ from sqlalchemy import Engine, text
 from rodai.config import Settings
 from rodai.detector import get_detector
 from rodai.retention import register_artifact
+from rodai.tracking import RoadObjectTracker
 from rodai.video_pipeline import InvalidVideoError, write_jsonl_session
 
 logger = logging.getLogger("rodai.sessions")
@@ -330,6 +331,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
         result_path.parent.mkdir(parents=True, exist_ok=True)
         output = result_path.open("w", encoding="utf-8", newline="\n")
         start_time = time.monotonic()
+        tracker = RoadObjectTracker()
         processed_frames = 0
         dropped_frames = 0
         last_frame_id = -1
@@ -438,6 +440,11 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                 detections: list[dict[str, Any]] = []
                 if detector:
                     detections = await asyncio.to_thread(detector, frame)
+                tracks = (
+                    tracker.update(detections, timestamp_ms=capture_time, frame_id=frame_id)
+                    if detector
+                    else []
+                )
                 frame_record = {
                     "schema_version": "rodai.session.v1",
                     "type": "frame",
@@ -451,7 +458,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                     "capture_settings": camera_settings,
                     "dropped_since_last": dropped,
                     "detections": detections,
-                    "tracks": [],
+                    "tracks": tracks,
                     "inference": "complete" if detector else "not-run",
                 }
                 output.write(json.dumps(frame_record, separators=(",", ":")) + "\n")
@@ -484,6 +491,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                         "height": height,
                         "duration_ms": elapsed_ms,
                         "detections": detections,
+                        "tracks": tracks,
                         "inference": "complete" if detector else "not-run",
                     }
                 )
