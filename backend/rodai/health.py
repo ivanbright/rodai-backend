@@ -8,8 +8,18 @@ from rodai.database import database_status
 
 
 def runtime_device(configured_device: str) -> str:
-    # No inference framework is installed in the foundation phase. Do not claim a GPU exists.
-    return "cpu" if configured_device in {"auto", "cpu"} else "unavailable"
+    """Return the device available to the inference runtime, without guessing hardware."""
+    try:
+        import torch
+    except ImportError:
+        return "cpu" if configured_device in {"auto", "cpu"} else "unavailable"
+
+    cuda_available = torch.cuda.is_available()
+    if configured_device == "cuda":
+        return "cuda" if cuda_available else "unavailable"
+    if configured_device == "auto":
+        return "cuda" if cuda_available else "cpu"
+    return "cpu"
 
 
 def build_health(settings: Settings, engine: Engine) -> dict[str, Any]:

@@ -6,7 +6,7 @@
 - `frontend`: Node 22 Vite dev server with hot reload.
 - `postgres`: PostgreSQL 17 for local/production engine parity.
 
-`docker compose up --build` starts the services. Apply migrations as an explicit operation with `docker compose run --rm backend alembic upgrade head`; app startup does not run migrations. Run tests with `scripts/run-tests.ps1`.
+`docker compose up --build` starts the services: `rodai-db` for PostgreSQL, `rodai-api` for FastAPI, and `rodai-frontend` for Vite. Apply migrations as an explicit operation with `docker compose run --rm rodai-api alembic upgrade head`; app startup does not run migrations. Run tests with `scripts/run-tests.ps1`.
 
 ## Image details
 

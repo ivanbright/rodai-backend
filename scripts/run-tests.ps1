@@ -1,3 +1,3 @@
 $ErrorActionPreference = 'Stop'
-docker compose run --rm backend python -m pytest
-docker compose run --rm frontend npm test
+docker compose run --rm rodai-api python -m pytest
+docker compose run --rm rodai-frontend npm test

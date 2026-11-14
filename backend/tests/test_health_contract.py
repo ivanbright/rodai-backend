@@ -1,7 +1,11 @@
+import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from rodai.config import Settings
-from rodai.health import build_health
+from rodai.health import build_health, runtime_device
 
 
 class UnavailableEngine:
@@ -26,3 +30,20 @@ def test_production_rejects_default_secret() -> None:
         assert "RODAI_SECRET_KEY" in str(exc)
     else:
         raise AssertionError("production accepted a development secret")
+
+
+def test_auto_device_uses_cuda_only_when_runtime_reports_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A small fake runtime isolates device selection from the host's actual hardware.
+    fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    assert runtime_device("auto") == "cuda"
+
+
+def test_explicit_cuda_is_unavailable_when_runtime_has_no_cuda(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    assert runtime_device("cuda") == "unavailable"

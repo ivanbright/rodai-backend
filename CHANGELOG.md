@@ -12,3 +12,12 @@
 - Added FastAPI health/system endpoints, Pydantic Settings, PostgreSQL connection status and initial Alembic metadata migration.
 - Added CPU-only container build, Docker Compose services, environment example, React status viewer, tests and operations/security/privacy/licence docs.
 - Docker runtime acceptance is pending: Docker daemon unavailable and frontend npm lockfile generation did not complete.
+
+## Unreleased — Phase 1 verification and runtime status (2026-11-14)
+
+- Verified Compose PostgreSQL, API and frontend startup; frontend API proxy returns healthy state with database available.
+- Applied Alembic `0001_initial`; added PyTorch-backed CUDA availability detection with CPU fallback and unavailable reporting for requested CUDA when absent.
+- Added API health dependency ordering for the Compose frontend and ignored local pip cache/temp directories.
+- Backend pytest (4 passed), Ruff, frontend production build, ESLint and Vitest (1 passed) pass. Host pytest ran on Python 3.13.2; Docker API image uses Python 3.12.8.
+- `npm ci` reported 14 dependency vulnerabilities; advisory lookup via `npm audit` failed TLS certificate verification and remains unresolved.
+- Video input, sessions, detector inference and model weights remain unimplemented.

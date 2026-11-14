@@ -1,2 +1,2 @@
 $ErrorActionPreference = 'Stop'
-docker compose up --build backend postgres
+docker compose up --build rodai-api rodai-db

@@ -7,7 +7,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="RODAI_", case_sensitive=False, populate_by_name=True)
+    model_config = SettingsConfigDict(
+        env_prefix="RODAI_", case_sensitive=False, populate_by_name=True
+    )
 
     environment: Literal["local", "staging", "production"] = Field("local", alias="RODAI_ENV")
     port: int = Field(8000, alias="PORT", ge=1, le=65535)

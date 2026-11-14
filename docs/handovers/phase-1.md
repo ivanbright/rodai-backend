@@ -47,3 +47,26 @@ Python files are syntactically compilable. Actual startup, database connectivity
 Resolve the local Docker daemon and npm registry access; generate the frontend lockfile; build the image, start the stack, run migrations, backend/frontend tests and linters inside containers, record image digest/size, then update this handover with actual output. Only after Phase 1 acceptance passes should work move to Phase 1B.
 
 Before deployment/benchmark phases, confirm Railway plan/budget, domain/DNS, user audience, retention, upload size/duration, public camera need, detector licensing and hardware. No detector or weights are selected, and exact dependency/transitive licences still require release review.
+
+## Verification update — 2026-11-14
+
+This update supersedes the earlier pending Docker/npm verification notes above for the current local workspace.
+
+### Verified
+
+- `docker compose ps`: PostgreSQL healthy; API healthy; frontend running.
+- `GET http://localhost:8000/api/v1/health`: healthy, database available, CPU selected, detector unavailable, data volume available.
+- `GET http://localhost:5173/`: HTTP 200. `GET http://localhost:5173/api/v1/health` returns the API health JSON through the Vite proxy.
+- `docker compose exec -T rodai-api alembic upgrade head` applied revision `0001_initial`; `alembic current` reports `0001_initial (head)`.
+- Docker runtime is Python 3.12.8 with PyTorch `2.14.1+cpu`; `torch.cuda.is_available()` returned `False`.
+- Backend host checks: `pytest` 4 passed; `ruff check rodai tests` passed. Host Python was 3.13.2, outside the declared project range; the running Docker app uses Python 3.12.8.
+- Frontend checks: `npm run build` passed, `npm run lint` passed, `npm test -- --run` passed (1 test).
+- API health queries PyTorch for CUDA availability; automatic selection uses CUDA only when available, otherwise CPU. Explicit CUDA reports unavailable when absent.
+- Compose frontend waits for API health before starting, avoiding the startup race observed in earlier proxy logs.
+
+### Remaining limitations
+
+- `npm ci` reported 14 dependency vulnerabilities (2 low, 9 moderate, 1 high, 2 critical). `npm audit --json` could not retrieve details because certificate verification failed against the npm audit endpoint. Investigate before deployment; no forced dependency updates were applied.
+- Target camera, sample footage and permissions, hardware inventory, and detector code/weight licensing are still unresolved. No model weights or inference pipeline are present.
+- The plain foundation viewer has no upload, detections, tracks, or analysis; those are Phase 2 and Phase 3 scope.
+- Public Railway deployment remains blocked on deployment audience, authentication, privacy/retention and spend decisions.
