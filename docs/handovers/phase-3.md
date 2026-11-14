@@ -22,16 +22,16 @@ Status: **CPU detector integrated and exercised end to end on a local, licensed 
 
 ## Run the local demo
 
-Docker currently maps ports 8000 and 5432 in another project, so this workspace is running with an ignored temporary Compose override: API `http://localhost:8001`, UI `http://localhost:5174`. Health: `http://localhost:8001/api/v1/health`. The override is `.temp/demo-ports.compose.yml` and replaces only host port mappings.
+Docker currently maps ports 8000 and 5432 in another project, so this workspace is running with the local Compose override: API `http://localhost:8001`, UI `http://localhost:5173`. Health: `http://localhost:8001/api/v1/health`. The override is `docker-compose.local.yml` and replaces only host port mappings.
 
 From `D:\rodai` in PowerShell, run:
 
 ```powershell
-docker compose -f docker-compose.yml -f .temp/demo-ports.compose.yml up -d --build rodai-db rodai-api rodai-frontend
-docker compose -f docker-compose.yml -f .temp/demo-ports.compose.yml ps
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build rodai-db rodai-api rodai-frontend
+docker compose -f docker-compose.yml -f docker-compose.local.yml ps
 ```
 
-Then open `http://localhost:5174`, choose an MP4, MOV, MKV, WebM or AVI video, press **Process video**, and wait for completion. Play the preview to see boxes and labels synchronized to playback; session history contains the JSONL results. The first run downloads the pinned model checkpoint. This local smoke sample is at `.temp/samples/cars-motorcycles-pexels-20669311-demo.avi`; its source/licensing and privacy notes are in [sample-video-manifest.md](../sample-video-manifest.md). It is not committed.
+Then open `http://localhost:5173`, choose an MP4, MOV, MKV, WebM or AVI video, press **Process video**, and wait for completion. Play the preview to see boxes and labels synchronized to playback; session history contains the JSONL results. The first run downloads the pinned model checkpoint. This local smoke sample is at `.temp/samples/cars-motorcycles-pexels-20669311-demo.avi`; its source/licensing and privacy notes are in [sample-video-manifest.md](../sample-video-manifest.md). It is not committed.
 
 ## Limits and remaining acceptance
 

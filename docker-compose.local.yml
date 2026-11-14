@@ -1,0 +1,8 @@
+# Local host-port override for machines where another service uses port 8000.
+services:
+  rodai-api:
+    ports: !override
+      - "8001:8000"
+  rodai-frontend:
+    ports: !override
+      - "5173:5173"
