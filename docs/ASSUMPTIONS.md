@@ -9,7 +9,7 @@ Updated 2026-11-14. Owner-provided decisions in `DECISIONS.md` replace earlier p
 - PostgreSQL is the primary persistent store, and the existing Compose PostgreSQL configuration must be preserved.
 - One processing session, 500 MB uploads, 600-second duration, binary WebSocket JPEG camera frames with frame IDs/timestamps, ordered upload processing, bounded live processing with drop counts.
 - Commercial compatibility is desired; no AGPL-3.0 without explicit approval; code, weights and datasets each require a licence review.
-- Privacy/retention defaults, invite-only hosted access, same-origin Railway topology and the planned domain are recorded in `DECISIONS.md`.
+- Privacy/retention defaults, invite-only hosted access, split Railway frontend/API topology and the planned domain are recorded in `DECISIONS.md`.
 
 ## Unknown facts and implementation gaps (not assumptions)
 

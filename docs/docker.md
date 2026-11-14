@@ -2,7 +2,7 @@
 
 ## Local services
 
-- `backend`: FastAPI, PostgreSQL client, CPU-only PyTorch and built frontend assets. One Uvicorn worker is configured because session state and model memory are process-local.
+- `backend`: FastAPI, PostgreSQL client and CPU-only PyTorch. The API image does not bundle the frontend. One Uvicorn worker is configured because session state and model memory are process-local.
 - `frontend`: Node 22 Vite dev server with hot reload.
 - `postgres`: PostgreSQL 17 for local/production engine parity.
 
