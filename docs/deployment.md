@@ -22,7 +22,7 @@ For the API service, use the Dockerfile builder with path `backend/Dockerfile`, 
 2. Create PostgreSQL, API, and frontend services using their respective `main` branches. Enable Railway's wait-for-CI deployment gate for both code services.
 3. Import the API and frontend variable templates into their matching services. Set the API origin in the frontend variable and create a fresh API secret.
 4. Attach the API volume at `/var/lib/rodai`; confirm the service user can write it.
-5. Configure database connectivity. Run Alembic migration as an explicit release step with documented rollback.
+5. Configure database connectivity. Run `alembic upgrade head` as an explicit release step before deploying a backend version that expects new columns. Revision `0003_session_failure_details` stores failure diagnostics; back up the database and document the matching downgrade before applying it.
 6. Set `/api/v1/health` as the API health check, verify database/device/model/volume status, and test app + WebSocket behavior.
 7. Only after separate approval, attach `rodai.cursorclick.dev` to the frontend and configure DNS; wait for TLS issuance, verify `https://` and `wss://`, and add its origin to API CORS.
 8. Verify authenticated access, upload caps, retention/delete behavior, rate limits, logs, backup, volume persistence across redeploy, and rollback.

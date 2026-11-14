@@ -2,6 +2,7 @@ import json
 import threading
 import time
 from pathlib import Path
+from uuid import uuid4
 
 import cv2
 import numpy as np
@@ -26,7 +27,7 @@ def session_client(tmp_path: Path) -> tuple[TestClient, Path]:
         connection.exec_driver_sql(
             "CREATE TABLE sessions (id VARCHAR(36) PRIMARY KEY, source_id VARCHAR(36), "
             "status VARCHAR(32) NOT NULL, created_at DATETIME NOT NULL, ended_at DATETIME, "
-            "camera_config JSON)"
+            "camera_config JSON, error TEXT)"
         )
         connection.exec_driver_sql(
             "CREATE TABLE session_results (id VARCHAR(36) PRIMARY KEY, session_id VARCHAR(36), "
@@ -123,6 +124,32 @@ def test_invalid_video_is_reported_as_failed_session(
     session = _wait_for_session(client, response.json()["id"])
     assert session["status"] == "failed"
     assert "readable video" in session["error"]
+
+
+def test_persisted_failed_session_keeps_its_diagnostic(
+    session_client: tuple[TestClient, Path],
+) -> None:
+    client, data_dir = session_client
+    engine = create_engine(f"sqlite:///{data_dir / 'sessions.sqlite'}")
+    session_id = str(uuid4())
+    source_id = str(uuid4())
+    diagnostic = "Processing was interrupted when the API restarted. Start a new analysis."
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO sources (id, source_type, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+            (source_id, "video"),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO sessions (id, source_id, status, created_at, error) "
+            "VALUES (?, ?, 'failed', CURRENT_TIMESTAMP, ?)",
+            (session_id, source_id, diagnostic),
+        )
+
+    response = client.get(f"/api/v1/sessions/{session_id}")
+
+    assert response.status_code == 200
+    assert response.json()["error"] == diagnostic
+    engine.dispose()
 
 
 def test_video_upload_rejects_unsupported_extensions(
