@@ -144,7 +144,8 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
         with engine.connect() as connection:
             rows = connection.execute(
                 text(
-                    "SELECT s.id, s.status, s.created_at, s.camera_config, s.error, src.source_type "
+                    "SELECT s.id, s.status, s.created_at, s.camera_config, s.error, "
+                    "src.source_type "
                     "FROM sessions AS s LEFT JOIN sources AS src ON src.id = s.source_id "
                     "ORDER BY s.created_at DESC LIMIT :limit"
                 ),
@@ -593,7 +594,8 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             row = (
                 connection.execute(
                     text(
-                        "SELECT s.id, s.status, s.created_at, s.camera_config, s.error, src.source_type "
+                        "SELECT s.id, s.status, s.created_at, s.camera_config, s.error, "
+                        "src.source_type "
                         "FROM sessions AS s LEFT JOIN sources AS src ON src.id = s.source_id "
                         "WHERE s.id = :id"
                     ),
