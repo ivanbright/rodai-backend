@@ -1,8 +1,18 @@
 FROM node:22.13.1-alpine3.21 AS frontend-build
+RUN apk add --no-cache git
 WORKDIR /frontend
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
 COPY frontend/ ./
+# Railway's source snapshot does not include git submodules, so frontend/ arrives
+# empty. Fall back to cloning the public frontend repo at the pinned commit.
+# Keep FRONTEND_REF in sync with the frontend submodule pointer.
+ARG FRONTEND_REPO=https://github.com/ivanbright/rodai-frontend.git
+ARG FRONTEND_REF=ef0419b10d33c56f9fb2103bac56f17d4b70ac49
+RUN if [ ! -f package.json ]; then \
+      git init -q . && git remote add origin "$FRONTEND_REPO" \
+      && git fetch -q --depth 1 origin "$FRONTEND_REF" && git checkout -q FETCH_HEAD \
+      && rm -rf .git; \
+    fi
+RUN npm ci
 RUN npm run build
 
 FROM python:3.12.8-slim-bookworm AS build
