@@ -37,6 +37,7 @@ def process_video(
     session_id: str,
     max_video_seconds: int | None = None,
     should_continue: Callable[[], bool] | None = None,
+    detect_frame: Callable[[Any], list[dict[str, Any]]] | None = None,
 ) -> tuple[VideoMetadata, int, bool]:
     """Decode every frame in order and emit honest frame-echo records."""
     capture = cv2.VideoCapture(str(video_path))
@@ -52,9 +53,7 @@ def process_video(
         height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         duration_ms = round(reported_count / raw_fps * 1000) if reported_count and raw_fps else None
         if max_video_seconds and duration_ms and duration_ms > max_video_seconds * 1000:
-            raise InvalidVideoError(
-                f"Video exceeds the {max_video_seconds} second duration limit."
-            )
+            raise InvalidVideoError(f"Video exceeds the {max_video_seconds} second duration limit.")
 
         frame_id = 0
         stopped = False
@@ -76,7 +75,9 @@ def process_video(
             timestamp_ms = (
                 round(raw_timestamp)
                 if math.isfinite(raw_timestamp) and raw_timestamp >= 0
-                else round(frame_id / raw_fps * 1000) if raw_fps else None
+                else round(frame_id / raw_fps * 1000)
+                if raw_fps
+                else None
             )
             if (
                 max_video_seconds
@@ -86,6 +87,7 @@ def process_video(
                 raise InvalidVideoError(
                     f"Video exceeds the {max_video_seconds} second duration limit."
                 )
+            detections = detect_frame(frame) if detect_frame else []
             write_record(
                 {
                     "schema_version": "rodai.session.v1",
@@ -95,9 +97,9 @@ def process_video(
                     "timestamp_ms": timestamp_ms,
                     "width": width,
                     "height": height,
-                    "detections": [],
+                    "detections": detections,
                     "tracks": [],
-                    "inference": "not-run",
+                    "inference": "complete" if detect_frame else "not-run",
                 }
             )
             frame_id += 1
@@ -119,9 +121,11 @@ def write_jsonl_session(
     session_id: str,
     max_video_seconds: int | None = None,
     should_continue: Callable[[], bool] | None = None,
+    detect_frame: Callable[[Any], list[dict[str, Any]]] | None = None,
 ) -> tuple[VideoMetadata, int, bool]:
     result_path.parent.mkdir(parents=True, exist_ok=True)
     with result_path.open("w", encoding="utf-8", newline="\n") as output:
+
         def write_record(record: dict[str, Any]) -> None:
             output.write(json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n")
             if record.get("type") == "frame" and record["frame_id"] % 25 == 0:
@@ -134,6 +138,7 @@ def write_jsonl_session(
             session_id=session_id,
             max_video_seconds=max_video_seconds,
             should_continue=should_continue,
+            detect_frame=detect_frame,
         )
         summary = {
             "schema_version": "rodai.session.v1",
@@ -141,7 +146,7 @@ def write_jsonl_session(
             "session_id": session_id,
             "processed_frames": processed_frames,
             "video": asdict(metadata),
-            "inference": "not-run",
+            "inference": "complete" if detect_frame else "not-run",
             "status": "stopped" if stopped else "completed",
         }
         write_record(summary)

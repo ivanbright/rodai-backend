@@ -33,3 +33,15 @@ Status: **Implemented and locally verified.** This phase performs video decoding
 - UI: `http://localhost:5173`; API health: `http://localhost:8000/api/v1/health`.
 - API endpoints are under `/api/v1/sessions`; WebSocket route is `/api/v1/sessions/ws/{session_id}`.
 - See `docs/PROJECT_STATE.md` for current phase and outstanding decisions.
+
+## Owner-approved conformance closeout — 2026-11-14
+
+The owner approved Phase 0 and directed implementation to continue. This update supersedes the earlier status and limitation notes where noted below.
+
+- Configurable expiry policies are implemented: upload 7 days, result/session history 30 days, stored download copies 7 days, each configurable with validated settings. An hourly sweep deletes files before records, writes an audit result for each attempt, and retains failures for retry. Model/checkpoint paths cannot be registered for automatic expiry.
+- Existing database upgrade: run `docker compose run --rm rodai-api alembic upgrade head` to apply `0002_retention_camera_config`.
+- Browser camera defaults to 1280×720, offers 960×540 and 640×360, configures JPEG quality 0.50–0.95 (default 0.82), downscales client frames, validates size/quality server-side, and acknowledges the effective configuration.
+- Live stop messages include any final client drop count. Drop totals appear in session responses, results, and the live session card.
+- The one-active-session rule remains enforced and returns HTTP 409 on collision.
+- Automated acceptance: `pytest -q` — 13 passed, including synthetic ordered video, camera settings negotiation/invalid values, one-session conflict, trailing drop totals, expiration boundary/retry/idempotency and model-expiry protection. Ruff passed. Frontend build and ESLint passed; see latest Vitest result in Phase 3 handover.
+- Runtime closeout: Docker became available later in this continuation. Migration `0002_retention_camera_config` was applied to the local Compose database; PostgreSQL and API report healthy. The current runtime evidence and port override are recorded in `phase-3.md`.

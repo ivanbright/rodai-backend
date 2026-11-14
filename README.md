@@ -4,7 +4,7 @@ RodAI is a local-first road perception and movement analysis laboratory. Its out
 
 ## Current status
 
-Phase 2 video and session pipeline is implemented. The app accepts local video uploads and browser-camera streams, decodes and records frame-aligned JSONL results, and supports session controls. Detection, tracking and model inference are not yet implemented; the app does not fabricate detections.
+Phase 3 detector integration is in progress. Docker Compose configures a pinned DETR ResNet-50 CPU model. Uploaded videos receive frame-aligned vehicle/person detections and the browser overlays them on playback; camera streams have configurable capture size/quality and live boxes. A first inference downloads model weights into the persistent `rodai_data` volume. Tracking, crash prediction and target-region validation are not implemented.
 
 ## Requirements
 
@@ -18,7 +18,8 @@ Phase 2 video and session pipeline is implemented. The app accepts local video u
 1. Copy `.env.example` to `.env` and adjust local settings if needed. Never use the example secret for a shared deployment.
 2. Run `docker compose up --build` from the repository root.
 3. Open `http://localhost:5173` for the Vite development viewer or `http://localhost:8000/api/v1/health` for backend health.
-4. Apply database migrations explicitly with `docker compose run --rm rodai-api alembic upgrade head`.
+4. Apply database migrations explicitly with `docker compose run --rm rodai-api alembic upgrade head` before creating sessions. The current schema is `0002_retention`.
+5. Process an owner-provided video with documented usage rights. The first inference downloads and caches the configured detector weights; later runs reuse that cache. Check `/api/v1/health` for detector readiness.
 
 Local containers use PostgreSQL to match the deployment engine. The Vite server proxies `/api` to FastAPI. The backend serves the production frontend build from the same origin.
 
@@ -26,7 +27,7 @@ Local containers use PostgreSQL to match the deployment engine. The Vite server 
 
 Run `scripts/run-tests.ps1` from PowerShell. Backend tests use pytest; frontend tests use Vitest. Run backend lint with `docker compose run --rm rodai-api ruff check .` and the frontend lint script with `docker compose run --rm rodai-frontend npm run lint`.
 
-The local Compose stack has been verified with PostgreSQL, API and frontend containers. Phase 2 backend and frontend checks are recorded in `docs/handovers/phase-2.md`; see `docs/handovers/phase-1.md` for foundation checks and remaining limitations.
+Synthetic pipeline tests do not validate detector accuracy. Phase 2 conformance and Phase 3 implementation status are recorded in `docs/handovers/phase-2.md` and `docs/handovers/phase-3.md`; see `docs/MODEL_PROVENANCE.md` for model and data source notes.
 
 ## Configuration and deployment
 

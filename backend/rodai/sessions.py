@@ -29,14 +29,23 @@ from fastapi import (
     status,
 )
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import Engine, text
 
 from rodai.config import Settings
+from rodai.detector import get_detector
+from rodai.retention import register_artifact
 from rodai.video_pipeline import InvalidVideoError, write_jsonl_session
 
 logger = logging.getLogger("rodai.sessions")
 
 VIDEO_SUFFIXES = {".avi", ".m4v", ".mkv", ".mov", ".mp4", ".webm"}
+
+
+class CameraSettingsRequest(BaseModel):
+    max_width: int = Field(1280, ge=320, le=1280)
+    max_height: int = Field(720, ge=240, le=720)
+    jpeg_quality: float = Field(0.82, ge=0.50, le=0.95)
 
 
 @dataclass
@@ -48,8 +57,10 @@ class SessionState:
     uploaded_bytes: int
     source_type: str = "video"
     processed_frames: int = 0
+    dropped_frames: int = 0
     metadata: dict[str, Any] | None = None
     error: str | None = None
+    camera_settings: dict[str, int | float] | None = None
 
     def response(self) -> dict[str, Any]:
         return asdict(self) | {"result_url": f"/api/v1/sessions/{self.id}/results"}
@@ -122,6 +133,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
     router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
     registry = SessionRegistry()
     incoming_dir = settings.data_dir / ".incoming"
+    uploads_dir = settings.data_dir / "uploads"
     sessions_dir = settings.data_dir / "sessions"
 
     @router.get("")
@@ -129,7 +141,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
         with engine.connect() as connection:
             rows = connection.execute(
                 text(
-                    "SELECT s.id, s.status, s.created_at, src.source_type "
+                    "SELECT s.id, s.status, s.created_at, s.camera_config, src.source_type "
                     "FROM sessions AS s LEFT JOIN sources AS src ON src.id = s.source_id "
                     "ORDER BY s.created_at DESC LIMIT :limit"
                 ),
@@ -149,6 +161,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                         row["status"],
                         row["created_at"],
                         row["source_type"] or "video",
+                        row["camera_config"],
                     )
                 )
         return items
@@ -161,9 +174,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
     ) -> dict[str, Any]:
         suffix = Path(filename).suffix.lower()
         if suffix not in VIDEO_SUFFIXES:
-            raise HTTPException(
-                415, "Choose a supported video file (MP4, MOV, MKV, WebM, or AVI)."
-            )
+            raise HTTPException(415, "Choose a supported video file (MP4, MOV, MKV, WebM, or AVI).")
         content_type = request.headers.get("content-type", "").split(";", 1)[0].lower()
         if (
             content_type
@@ -188,6 +199,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             raise HTTPException(409, str(exc)) from exc
 
         upload_path = incoming_dir / f"{state_id}{suffix}"
+        retained_upload_path = uploads_dir / f"{state_id}{suffix}"
         byte_limit = settings.max_upload_mb * 1024 * 1024
         received = 0
         try:
@@ -205,12 +217,32 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                 raise HTTPException(400, "The uploaded video is empty.")
             registry.update(state_id, uploaded_bytes=received, status="queued")
             await asyncio.to_thread(_create_database_session, engine, state_id)
+            uploads_dir.mkdir(parents=True, exist_ok=True)
+            upload_path.replace(retained_upload_path)
+            register_artifact(
+                engine,
+                session_id=state_id,
+                artifact_type="upload",
+                relative_path=str(retained_upload_path.relative_to(settings.data_dir)),
+                retention_days=settings.upload_retention_days,
+            )
+            register_artifact(
+                engine,
+                session_id=state_id,
+                artifact_type="session",
+                relative_path=None,
+                retention_days=settings.results_retention_days,
+            )
         except HTTPException:
             upload_path.unlink(missing_ok=True)
+            retained_upload_path.unlink(missing_ok=True)
+            _delete_session_records(engine, state_id)
             registry.remove(state_id)
             raise
         except Exception as exc:
             upload_path.unlink(missing_ok=True)
+            retained_upload_path.unlink(missing_ok=True)
+            _delete_session_records(engine, state_id)
             registry.remove(state_id)
             logger.exception("Failed to create video session")
             raise HTTPException(
@@ -224,7 +256,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             settings,
             registry,
             state_id,
-            upload_path,
+            retained_upload_path,
             sessions_dir / state_id / "results.jsonl",
         )
         state = registry.get(state_id)
@@ -232,7 +264,18 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
         return state.response()
 
     @router.post("/live", status_code=status.HTTP_201_CREATED)
-    def create_live_session() -> dict[str, Any]:
+    def create_live_session(camera: CameraSettingsRequest | None = None) -> dict[str, Any]:
+        camera = camera or CameraSettingsRequest(
+            max_width=settings.camera_max_width,
+            max_height=settings.camera_max_height,
+            jpeg_quality=settings.camera_jpeg_quality,
+        )
+        if (
+            camera.max_width > settings.camera_max_width
+            or camera.max_height > settings.camera_max_height
+        ):
+            raise HTTPException(422, "Camera size exceeds the configured capture ceiling.")
+        camera_config = camera.model_dump()
         session_id = str(uuid4())
         state = SessionState(
             id=session_id,
@@ -241,17 +284,28 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             created_at=datetime.now(UTC).isoformat(),
             uploaded_bytes=0,
             source_type="browser_camera",
+            camera_settings=camera_config,
         )
         try:
             registry.add(state, settings.max_concurrent_sessions)
             (sessions_dir / session_id).mkdir(parents=True, exist_ok=True)
-            _create_database_session(engine, session_id, source_type="browser_camera")
+            _create_database_session(
+                engine, session_id, source_type="browser_camera", camera_config=camera_config
+            )
+            register_artifact(
+                engine,
+                session_id=session_id,
+                artifact_type="session",
+                relative_path=None,
+                retention_days=settings.results_retention_days,
+            )
         except RuntimeError as exc:
             registry.remove(session_id)
             raise HTTPException(409, str(exc)) from exc
         except Exception as exc:
             registry.remove(session_id)
             shutil.rmtree(sessions_dir / session_id, ignore_errors=True)
+            _delete_session_records(engine, session_id)
             logger.exception("Failed to create browser camera session")
             raise HTTPException(503, "Could not create a camera session.") from exc
         return state.response()
@@ -284,8 +338,14 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
         final_status = "stopped"
         failure_message: str | None = None
         try:
+            detector = await asyncio.to_thread(get_detector, settings)
             await websocket.send_json(
-                {"protocol": "rodai.v1", "type": "session_started", "session_id": parsed_id}
+                {
+                    "protocol": "rodai.v1",
+                    "type": "session_started",
+                    "session_id": parsed_id,
+                    "capture_settings": state.camera_settings,
+                }
             )
             while True:
                 remaining_seconds = settings.max_video_seconds - (time.monotonic() - start_time)
@@ -304,6 +364,13 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                     continue
                 message_type = message.get("type")
                 if message_type == "stop":
+                    trailing_drops = message.get("dropped_since_last", 0)
+                    if (
+                        isinstance(trailing_drops, int)
+                        and not isinstance(trailing_drops, bool)
+                        and trailing_drops >= 0
+                    ):
+                        dropped_frames += trailing_drops
                     break
                 if message_type != "frame":
                     await websocket.send_json(
@@ -351,10 +418,26 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                     )
                     continue
                 height, width = int(frame.shape[0]), int(frame.shape[1])
+                camera_settings = state.camera_settings or {}
+                if width > int(
+                    camera_settings.get("max_width", settings.camera_max_width)
+                ) or height > int(camera_settings.get("max_height", settings.camera_max_height)):
+                    await websocket.send_json(
+                        {
+                            "protocol": "rodai.v1",
+                            "type": "error",
+                            "code": "frame_exceeds_capture_settings",
+                            "frame_id": frame_id,
+                        }
+                    )
+                    continue
                 last_frame_id = frame_id
                 dropped_frames += dropped
                 processed_frames += 1
                 server_time = datetime.now(UTC).isoformat()
+                detections: list[dict[str, Any]] = []
+                if detector:
+                    detections = await asyncio.to_thread(detector, frame)
                 frame_record = {
                     "schema_version": "rodai.session.v1",
                     "type": "frame",
@@ -365,10 +448,11 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                     "server_received_at": server_time,
                     "width": width,
                     "height": height,
+                    "capture_settings": camera_settings,
                     "dropped_since_last": dropped,
-                    "detections": [],
+                    "detections": detections,
                     "tracks": [],
-                    "inference": "not-run",
+                    "inference": "complete" if detector else "not-run",
                 }
                 output.write(json.dumps(frame_record, separators=(",", ":")) + "\n")
                 output.flush()
@@ -383,6 +467,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                 registry.update(
                     parsed_id,
                     processed_frames=processed_frames,
+                    dropped_frames=dropped_frames,
                     metadata=metadata,
                 )
                 await websocket.send_json(
@@ -398,7 +483,8 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                         "width": width,
                         "height": height,
                         "duration_ms": elapsed_ms,
-                        "inference": "not-run",
+                        "detections": detections,
+                        "inference": "complete" if detector else "not-run",
                     }
                 )
         except WebSocketDisconnect:
@@ -421,7 +507,9 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                         "width": width,
                         "height": height,
                         "duration_ms": elapsed_ms,
-                        "inference": "not-run",
+                        "inference": "complete"
+                        if settings.detection_model != "unavailable"
+                        else "not-run",
                         "status": final_status,
                     },
                     separators=(",", ":"),
@@ -429,6 +517,14 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                 + "\n"
             )
             output.close()
+            if result_path.is_file():
+                register_artifact(
+                    engine,
+                    session_id=parsed_id,
+                    artifact_type="result",
+                    relative_path=f"sessions/{parsed_id}/results.jsonl",
+                    retention_days=settings.results_retention_days,
+                )
             if final_status == "failed":
                 result_path.unlink(missing_ok=True)
             final_metadata = {
@@ -442,6 +538,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                 parsed_id,
                 status=final_status,
                 processed_frames=processed_frames,
+                dropped_frames=dropped_frames,
                 metadata=final_metadata if width and height else None,
                 error=failure_message,
             )
@@ -473,14 +570,18 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
         if state:
             return state.response()
         with engine.connect() as connection:
-            row = connection.execute(
-                text(
-                    "SELECT s.id, s.status, s.created_at, src.source_type "
-                    "FROM sessions AS s LEFT JOIN sources AS src ON src.id = s.source_id "
-                    "WHERE s.id = :id"
-                ),
-                {"id": parsed_id},
-            ).mappings().first()
+            row = (
+                connection.execute(
+                    text(
+                        "SELECT s.id, s.status, s.created_at, s.camera_config, src.source_type "
+                        "FROM sessions AS s LEFT JOIN sources AS src ON src.id = s.source_id "
+                        "WHERE s.id = :id"
+                    ),
+                    {"id": parsed_id},
+                )
+                .mappings()
+                .first()
+            )
         if not row:
             raise HTTPException(404, "Session not found.")
         return _persisted_session(
@@ -489,6 +590,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             row["status"],
             row["created_at"],
             row["source_type"] or "video",
+            row["camera_config"],
         )
 
     @router.post("/{session_id}/pause")
@@ -544,29 +646,62 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             if state is None:
                 raise HTTPException(404, "Session result is not available.")
             raise HTTPException(404, "Session result is not available.")
+        export_dir = settings.data_dir / "exports"
+        export_dir.mkdir(parents=True, exist_ok=True)
+        export_path = export_dir / f"{parsed_id}-{uuid4()}.jsonl"
+        shutil.copyfile(result_path, export_path)
+        register_artifact(
+            engine,
+            session_id=parsed_id,
+            artifact_type="export",
+            relative_path=str(export_path.relative_to(settings.data_dir)),
+            retention_days=settings.exports_retention_days,
+        )
         return FileResponse(
-            result_path,
+            export_path,
             media_type="application/x-ndjson",
             filename=f"rodai-session-{parsed_id}.jsonl",
         )
 
-    @router.delete(
-        "/{session_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response
-    )
+    @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
     def delete_session(session_id: str) -> Response:
         parsed_id = _parse_id(session_id)
         state = registry.get(parsed_id)
-        if state and state.status in {
-            "uploading", "queued", "processing", "paused", "stopping"
-        }:
+        if state and state.status in {"uploading", "queued", "processing", "paused", "stopping"}:
             raise HTTPException(409, "Stop or wait for the active session before deleting it.")
-        with engine.begin() as connection:
+        with engine.connect() as connection:
             row = connection.execute(
                 text("SELECT source_id FROM sessions WHERE id = :id"), {"id": parsed_id}
             ).first()
             if not row:
                 raise HTTPException(404, "Session not found.")
-            source_id = row[0]
+            artifacts = (
+                connection.execute(
+                    text("SELECT relative_path FROM retention_artifacts WHERE session_id=:id"),
+                    {"id": parsed_id},
+                )
+                .scalars()
+                .all()
+            )
+        try:
+            for relative in artifacts:
+                if relative:
+                    target = (settings.data_dir / relative).resolve()
+                    if settings.data_dir.resolve() not in target.parents:
+                        raise ValueError("Artifact path escapes the configured data directory")
+                    target.unlink(missing_ok=True)
+            shutil.rmtree(sessions_dir / parsed_id, ignore_errors=False)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            raise HTTPException(
+                503, "Session files could not be deleted; the session is retained for retry."
+            ) from exc
+        source_id = row[0]
+        with engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM retention_artifacts WHERE session_id=:id"), {"id": parsed_id}
+            )
             connection.execute(text("DELETE FROM events WHERE session_id = :id"), {"id": parsed_id})
             connection.execute(
                 text("DELETE FROM session_results WHERE session_id = :id"),
@@ -575,7 +710,6 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             connection.execute(text("DELETE FROM sessions WHERE id = :id"), {"id": parsed_id})
             if source_id:
                 connection.execute(text("DELETE FROM sources WHERE id = :id"), {"id": source_id})
-        shutil.rmtree(sessions_dir / parsed_id, ignore_errors=True)
         registry.remove(parsed_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -595,6 +729,7 @@ def _persisted_session(
     session_status: str,
     created_at: datetime | str,
     source_type: str = "video",
+    camera_config: str | dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
         "id": session_id,
@@ -604,10 +739,15 @@ def _persisted_session(
         "created_at": created_at.isoformat() if isinstance(created_at, datetime) else created_at,
         "uploaded_bytes": 0,
         "processed_frames": 0,
+        "dropped_frames": 0,
         "metadata": None,
         "error": None,
         "result_url": f"/api/v1/sessions/{session_id}/results",
     }
+    if camera_config:
+        result["camera_settings"] = (
+            json.loads(camera_config) if isinstance(camera_config, str) else camera_config
+        )
     result_path = settings.data_dir / "sessions" / session_id / "results.jsonl"
     if session_status in {"completed", "stopped"} and result_path.is_file():
         try:
@@ -615,6 +755,7 @@ def _persisted_session(
             summary_line = tail.splitlines()[-1]
             summary = json.loads(summary_line)
             result["processed_frames"] = summary.get("processed_frames", 0)
+            result["dropped_frames"] = summary.get("dropped_frames", 0)
             result["metadata"] = summary.get("video") or {
                 "width": summary.get("width", 0),
                 "height": summary.get("height", 0),
@@ -628,7 +769,11 @@ def _persisted_session(
 
 
 def _create_database_session(
-    engine: Engine, session_id: str, *, source_type: str = "video"
+    engine: Engine,
+    session_id: str,
+    *,
+    source_type: str = "video",
+    camera_config: dict[str, Any] | None = None,
 ) -> None:
     now = datetime.now(UTC)
     source_id = str(uuid4())
@@ -642,10 +787,15 @@ def _create_database_session(
         )
         connection.execute(
             text(
-                "INSERT INTO sessions (id, source_id, status, created_at) "
-                "VALUES (:id, :source_id, 'queued', :created_at)"
+                "INSERT INTO sessions (id, source_id, status, created_at, camera_config) "
+                "VALUES (:id, :source_id, 'queued', :created_at, :camera_config)"
             ),
-            {"id": session_id, "source_id": source_id, "created_at": now},
+            {
+                "id": session_id,
+                "source_id": source_id,
+                "created_at": now,
+                "camera_config": json.dumps(camera_config) if camera_config else None,
+            },
         )
         connection.execute(
             text(
@@ -660,6 +810,27 @@ def _create_database_session(
                 "created_at": now,
             },
         )
+
+
+def _delete_session_records(engine: Engine, session_id: str) -> None:
+    """Roll back any persisted session rows after failed artifact registration."""
+    try:
+        with engine.begin() as connection:
+            row = connection.execute(
+                text("SELECT source_id FROM sessions WHERE id=:id"), {"id": session_id}
+            ).first()
+            connection.execute(
+                text("DELETE FROM retention_artifacts WHERE session_id=:id"), {"id": session_id}
+            )
+            connection.execute(text("DELETE FROM events WHERE session_id=:id"), {"id": session_id})
+            connection.execute(
+                text("DELETE FROM session_results WHERE session_id=:id"), {"id": session_id}
+            )
+            connection.execute(text("DELETE FROM sessions WHERE id=:id"), {"id": session_id})
+            if row and row[0]:
+                connection.execute(text("DELETE FROM sources WHERE id=:id"), {"id": row[0]})
+    except Exception:
+        logger.exception("Could not roll back failed session records session_id=%s", session_id)
 
 
 def _update_session_status(
@@ -680,12 +851,16 @@ def recover_interrupted_sessions(settings: Settings, engine: Engine) -> None:
     """Mark sessions interrupted by an API restart and remove their temporary uploads."""
     try:
         with engine.begin() as connection:
-            rows = connection.execute(
-                text(
-                    "SELECT id FROM sessions "
-                    "WHERE status IN ('queued', 'processing', 'paused', 'stopping')"
+            rows = (
+                connection.execute(
+                    text(
+                        "SELECT id FROM sessions "
+                        "WHERE status IN ('queued', 'processing', 'paused', 'stopping')"
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             if rows:
                 connection.execute(
                     text(
@@ -732,8 +907,17 @@ def _process_video(
             session_id=session_id,
             max_video_seconds=settings.max_video_seconds,
             should_continue=control.should_continue if control else None,
+            detect_frame=get_detector(settings),
         )
         final_status = "stopped" if stopped else "completed"
+        if result_path.is_file():
+            register_artifact(
+                engine,
+                session_id=session_id,
+                artifact_type="result",
+                relative_path=str(result_path.relative_to(settings.data_dir)),
+                retention_days=settings.results_retention_days,
+            )
         registry.update(
             session_id,
             status=final_status,
@@ -762,5 +946,3 @@ def _process_video(
                 text("UPDATE sessions SET status = 'failed', ended_at = :ended_at WHERE id = :id"),
                 {"id": session_id, "ended_at": datetime.now(UTC)},
             )
-    finally:
-        upload_path.unlink(missing_ok=True)

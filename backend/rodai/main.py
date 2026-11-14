@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -12,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from rodai.config import get_settings
 from rodai.database import create_database_engine
 from rodai.health import build_health
+from rodai.retention import sweep_expired_artifacts
 from rodai.sessions import make_sessions_router, recover_interrupted_sessions
 
 settings = get_settings()
@@ -19,16 +21,24 @@ settings = get_settings()
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        return json.dumps({
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-        })
+        return json.dumps(
+            {
+                "level": record.levelname,
+                "logger": record.name,
+                "message": record.getMessage(),
+            }
+        )
 
 
 handler = logging.StreamHandler()
 handler.setFormatter(JsonFormatter())
-logging.basicConfig(level=settings.log_level.upper(), handlers=[handler,], force=True)
+logging.basicConfig(
+    level=settings.log_level.upper(),
+    handlers=[
+        handler,
+    ],
+    force=True,
+)
 logger = logging.getLogger("rodai.backend")
 engine = create_database_engine(settings)
 
@@ -37,7 +47,26 @@ engine = create_database_engine(settings)
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     logger.info("RodAI backend starting environment=%s", settings.environment)
     recover_interrupted_sessions(settings, engine)
+
+    async def expiry_loop() -> None:
+        while True:
+            try:
+                counts = await asyncio.to_thread(sweep_expired_artifacts, settings, engine)
+                if counts["deleted"] or counts["failed"]:
+                    logger.info(
+                        "Retention sweep deleted=%s failed=%s", counts["deleted"], counts["failed"]
+                    )
+            except Exception:
+                logger.exception("Retention sweep failed")
+            await asyncio.sleep(settings.retention_sweep_interval_seconds)
+
+    retention_task = asyncio.create_task(expiry_loop())
     yield
+    retention_task.cancel()
+    try:
+        await retention_task
+    except asyncio.CancelledError:
+        pass
     engine.dispose()
     logger.info("RodAI backend stopped")
 

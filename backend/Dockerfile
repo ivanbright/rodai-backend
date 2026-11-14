@@ -12,6 +12,8 @@ COPY backend/pyproject.toml backend/requirements.lock ./
 RUN python -m pip install --no-cache-dir --upgrade pip==25.0.1 \
     && python -m pip install --no-cache-dir --prefix=/install -r requirements.lock \
     && python -m pip install --no-cache-dir --prefix=/install torch==2.14.1 torchvision==0.29.1 --index-url https://download.pytorch.org/whl/cpu
+COPY backend/requirements.inference.lock ./requirements.inference.lock
+RUN python -m pip install --no-cache-dir --prefix=/install -r requirements.inference.lock
 COPY backend/rodai ./rodai
 COPY backend/migrations ./migrations
 COPY backend/alembic.ini ./alembic.ini

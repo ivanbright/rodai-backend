@@ -1,6 +1,6 @@
 # RodAI Decision Log
 
-Updated 2026-11-14. Decisions below are owner-provided requirements from the consolidated Phase 0 response. They guide the architecture but do **not** constitute Phase 0 approval. No new implementation phase is authorized until `APPROVED: Phase 0` is received.
+Updated 2026-11-14. The owner subsequently stated “I approved everything” and directed the next phases to begin. This is recorded as explicit Phase 0 approval and authorization to continue implementation. Approval does not change the constraints and limits recorded below.
 
 | ID | Owner decision / requirement | Status or remaining condition |
 |---|---|---|
@@ -23,17 +23,17 @@ Updated 2026-11-14. Decisions below are owner-provided requirements from the con
 
 ## Still open
 
-- Phase 0 gate: owner explicitly withheld approval pending review of the architecture report.
+- Phase 0 gate: approved by the owner's explicit follow-up on 2026-11-14.
 - Permissioned sample footage/source manifests; exact hardware inventory; Windows edition and CPU/GPU details.
 - Applicable privacy-law interpretation and any required legal review for intended footage/use.
 - Railway plan and spend ceiling before provisioning or deployment.
 - Exact detector implementation, weights, licences, class map and evaluation plan.
-- Phase 2 implementation conformity: concurrency enforcement and configurable camera resolution/JPEG quality need review against the newly confirmed decisions.
-- Retention behavior and authentication are future implementation requirements, not current features.
+- Phase 2 conformity is implemented in the current working tree: retention, camera limits/settings, concurrency and drop reporting have deterministic tests; apply Alembic revision `0002_retention` to an existing database before running the updated API.
+- Authentication/deployment remains future work; public deployment is not part of this local demo.
 
 ## Phase 2 completion requirements before Phase 3
 
-These are requirements, not claims that the work is implemented. Detailed plan and measurable acceptance criteria are in `docs/handovers/phase-0.md`.
+These were requirements and are now implemented in the current working tree. The latest acceptance evidence and remaining limitations are in `docs/handovers/phase-0.md` and `docs/handovers/phase-3.md`.
 
 - Expire server-held uploaded videos after 7 days, results/history after 30 days, and stored export artifacts after 7 days; keep policy configurable, log deletions, safely retry failures, and protect model/checkpoint files referenced by experiments.
 - Browser capture defaults to max 1280x720, supports lower sizes, configurable JPEG quality, server-side validation and negotiated/effective settings; higher settings require measured performance evidence.

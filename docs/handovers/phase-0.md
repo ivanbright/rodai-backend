@@ -1,7 +1,7 @@
 # RodAI Phase 0 Handover — Inspection and Architecture
 
 Date: 2026-11-12  
-Status: **Report prepared; Phase 0 is not approved or complete.** No application code was written and no packages were installed.
+Status: **Phase 0 approved by the owner on 2026-11-14.** Subsequent implementation status and evidence are recorded at the end of this report and in phase-specific handovers.
 
 Update: Owner supplied `rodai-docker-railway-addendum.md` and authorized work to start. This revision incorporates its requirements. It does not resolve owner-only details such as the Railway plan/budget, domain, intended users, retention, or detector licence.
 
@@ -239,3 +239,8 @@ The single app service serving frontend assets and API is the recommended defaul
 The following are not yet known and cannot be assumed: Railway subscription and spend limit, domain/DNS, user audience, retention/privacy rules, upload caps, whether camera is needed on public deployment, detector licensing, and local Postgres-vs-SQLite preference. See questions 12–19 in `docs/QUESTIONS.md`. Do not deploy a publicly reachable service before authentication and detector licensing are resolved.
 
 Phase sequence is now: Phase 0 revised design/owner choices → Phase 1 containerized local foundation → Phase 1B Railway skeleton/auth/health/volume/rollback → Phase 2 video/session protocol → subsequent phases with addendum container and deployment evidence. Each remains subject to the prompt’s phase approval gate.
+
+
+## Implementation status update ? 2026-11-14
+
+The owner later directed the project to continue with the next phases. Phase 2 conformance is now implemented and locally verified; Phase 3 has a pinned DETR CPU integration and an end-to-end local smoke run. These results do not close target footage acceptance or establish performance. See `phase-2.md`, `phase-3.md`, and `docs/PROJECT_STATE.md` for current evidence and remaining gates. The earlier planning-only status text above records what was true at the time; this update supersedes it.

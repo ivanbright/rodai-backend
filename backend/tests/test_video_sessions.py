@@ -12,6 +12,7 @@ from sqlalchemy import create_engine
 
 from rodai.config import Settings
 from rodai.sessions import SessionControl, make_sessions_router
+from rodai.video_pipeline import process_video
 
 
 @pytest.fixture
@@ -24,11 +25,23 @@ def session_client(tmp_path: Path) -> tuple[TestClient, Path]:
         )
         connection.exec_driver_sql(
             "CREATE TABLE sessions (id VARCHAR(36) PRIMARY KEY, source_id VARCHAR(36), "
-            "status VARCHAR(32) NOT NULL, created_at DATETIME NOT NULL, ended_at DATETIME)"
+            "status VARCHAR(32) NOT NULL, created_at DATETIME NOT NULL, ended_at DATETIME, "
+            "camera_config JSON)"
         )
         connection.exec_driver_sql(
             "CREATE TABLE session_results (id VARCHAR(36) PRIMARY KEY, session_id VARCHAR(36), "
             "result_path VARCHAR(1024), schema_version VARCHAR(32), created_at DATETIME)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE retention_artifacts (id VARCHAR(36) PRIMARY KEY, session_id VARCHAR(36), "
+            "artifact_type VARCHAR(32), relative_path VARCHAR(1024), expires_at DATETIME, "
+            "created_at DATETIME, last_error VARCHAR(512))"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE retention_audit (id VARCHAR(36) PRIMARY KEY, artifact_id VARCHAR(36), "
+            "artifact_type VARCHAR(32), expires_at DATETIME, attempted_at DATETIME, "
+            "outcome VARCHAR(32), "
+            "detail VARCHAR(512))"
         )
         connection.exec_driver_sql(
             "CREATE TABLE events (id VARCHAR(36) PRIMARY KEY, session_id VARCHAR(36), "
@@ -42,9 +55,7 @@ def session_client(tmp_path: Path) -> tuple[TestClient, Path]:
 
 
 def _make_test_video(path: Path) -> bytes:
-    writer = cv2.VideoWriter(
-        str(path), cv2.VideoWriter_fourcc(*"MJPG"), 5.0, (64, 48)
-    )
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), 5.0, (64, 48))
     if not writer.isOpened():
         pytest.skip("This OpenCV build has no MJPG test-video encoder.")
     for value in (20, 80, 140):
@@ -126,6 +137,25 @@ def test_video_upload_rejects_unsupported_extensions(
     assert response.status_code == 415
 
 
+def test_video_pipeline_records_detector_output_by_frame(tmp_path: Path) -> None:
+    path = tmp_path / "detections.avi"
+    _make_test_video(path)
+    records: list[dict[str, object]] = []
+    metadata, count, stopped = process_video(
+        path,
+        records.append,
+        lambda _: None,
+        session_id="synthetic-test",
+        detect_frame=lambda _: [
+            {"class_id": 3, "label": "car", "confidence": 0.91, "bbox_xyxy": [1.0, 2.0, 30.0, 40.0]}
+        ],
+    )
+    assert count == 3 and not stopped
+    assert metadata.width == 64
+    assert all(record["inference"] == "complete" for record in records)
+    assert all(record["detections"][0]["label"] == "car" for record in records)
+
+
 def test_session_control_pauses_resumes_and_stops_cleanly() -> None:
     control = SessionControl()
     assert control.should_continue()
@@ -174,18 +204,52 @@ def test_browser_camera_stream_echoes_frame_ids_and_exports_results(
         assert result["capture_timestamp_ms"] == 1234.5
         assert result["processed_frames"] == 1
         assert result["dropped_frames"] == 2
-        websocket.send_json({"protocol": "rodai.v1", "type": "stop"})
+        websocket.send_json({"protocol": "rodai.v1", "type": "stop", "dropped_since_last": 3})
         ended = websocket.receive_json()
         assert ended["type"] == "session_ended"
         assert ended["status"] == "stopped"
 
     session = client.get(f"/api/v1/sessions/{session_id}").json()
     assert session["status"] == "stopped"
-    records = [
-        json.loads(line)
-        for line in client.get(session["result_url"]).text.splitlines()
-    ]
+    records = [json.loads(line) for line in client.get(session["result_url"]).text.splitlines()]
     assert records[0]["frame_id"] == 7
     assert records[0]["width"] == 64
-    assert records[-1]["dropped_frames"] == 2
+    assert records[-1]["dropped_frames"] == 5
     assert client.delete(f"/api/v1/sessions/{session_id}").status_code == 204
+
+
+def test_camera_settings_are_validated_negotiated_and_session_cap_is_enforced(
+    session_client: tuple[TestClient, Path],
+) -> None:
+    client, _ = session_client
+    first = client.post(
+        "/api/v1/sessions/live",
+        json={
+            "max_width": 640,
+            "max_height": 360,
+            "jpeg_quality": 0.7,
+        },
+    )
+    assert first.status_code == 201
+    assert first.json()["camera_settings"] == {
+        "max_width": 640,
+        "max_height": 360,
+        "jpeg_quality": 0.7,
+    }
+    conflict = client.post("/api/v1/sessions/live")
+    assert conflict.status_code == 409
+    invalid = client.post(
+        "/api/v1/sessions/live",
+        json={
+            "max_width": 1920,
+            "max_height": 1080,
+            "jpeg_quality": 1.0,
+        },
+    )
+    assert invalid.status_code == 422
+
+    with client.websocket_connect(f"/api/v1/sessions/ws/{first.json()['id']}") as websocket:
+        start = websocket.receive_json()
+        assert start["capture_settings"] == first.json()["camera_settings"]
+        websocket.send_json({"protocol": "rodai.v1", "type": "stop"})
+        assert websocket.receive_json()["type"] == "session_ended"
