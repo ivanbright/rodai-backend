@@ -1,5 +1,7 @@
 # RodAI Phase 4 Handover - Scripted Demonstration (Not the Product Lab)
 
+> **Product update (2026-11-14):** The frontend simulation tab and its synthetic scenario assets have been removed. This file is a historical record only; the active UI analyzes real video. See [PRODUCT_VISION.md](../PRODUCT_VISION.md) for current capabilities and limitations.
+
 Date: 2026-11-14  
 Status: **A small scripted UI demonstration exists. Owner-provided visual references clarified that the intended lab must analyze real road video; this scripted work does not satisfy that goal and must not be represented as the core lab.**
 
