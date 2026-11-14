@@ -262,7 +262,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             state_id,
             retained_upload_path,
             sessions_dir / state_id / "results.jsonl",
-            analysis_fps=state.analysis_fps or settings.analysis_fps,
+            analysis_fps=analysis_fps or settings.analysis_fps,
         )
         state = registry.get(state_id)
         assert state is not None
