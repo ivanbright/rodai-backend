@@ -132,9 +132,14 @@ class SessionRegistry:
             self._controls.pop(session_id, None)
 
 
-def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
+session_registry = SessionRegistry()
+
+
+def make_sessions_router(
+    settings: Settings, engine: Engine, registry: SessionRegistry | None = None
+) -> APIRouter:
     router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
-    registry = SessionRegistry()
+    registry = registry or SessionRegistry()
     incoming_dir = settings.data_dir / ".incoming"
     uploads_dir = settings.data_dir / "uploads"
     sessions_dir = settings.data_dir / "sessions"
@@ -223,7 +228,12 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             if received == 0:
                 raise HTTPException(400, "The uploaded video is empty.")
             registry.update(state_id, uploaded_bytes=received, status="queued")
-            await asyncio.to_thread(_create_database_session, engine, state_id)
+            await asyncio.to_thread(
+                _create_database_session,
+                engine,
+                state_id,
+                analysis_fps=analysis_fps or settings.analysis_fps,
+            )
             uploads_dir.mkdir(parents=True, exist_ok=True)
             upload_path.replace(retained_upload_path)
             register_artifact(
@@ -826,6 +836,7 @@ def _create_database_session(
     *,
     source_type: str = "video",
     camera_config: dict[str, Any] | None = None,
+    analysis_fps: float | None = None,
 ) -> None:
     now = datetime.now(UTC)
     source_id = str(uuid4())
@@ -839,14 +850,16 @@ def _create_database_session(
         )
         connection.execute(
             text(
-                "INSERT INTO sessions (id, source_id, status, created_at, camera_config) "
-                "VALUES (:id, :source_id, 'queued', :created_at, :camera_config)"
+                "INSERT INTO sessions "
+                "(id, source_id, status, created_at, camera_config, analysis_fps) "
+                "VALUES (:id, :source_id, 'queued', :created_at, :camera_config, :analysis_fps)"
             ),
             {
                 "id": session_id,
                 "source_id": source_id,
                 "created_at": now,
                 "camera_config": json.dumps(camera_config) if camera_config else None,
+                "analysis_fps": analysis_fps,
             },
         )
         connection.execute(
@@ -908,48 +921,134 @@ def _update_session_status(
         )
 
 
-def recover_interrupted_sessions(settings: Settings, engine: Engine) -> None:
-    """Mark sessions interrupted by an API restart and remove their temporary uploads."""
+def recover_interrupted_sessions(
+    settings: Settings,
+    engine: Engine,
+    registry: SessionRegistry | None = None,
+) -> list[tuple[SessionState, Path]]:
+    """Queue one safe restart attempt for interrupted uploaded videos."""
+    registry = registry or session_registry
+    resumed: list[tuple[SessionState, Path]] = []
     try:
-        with engine.begin() as connection:
-            rows = (
-                connection.execute(
-                    text(
-                        "SELECT id FROM sessions "
-                        "WHERE status IN ('queued', 'processing', 'paused', 'stopping')"
-                    )
+        with engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    "SELECT s.id, s.status, s.created_at, s.analysis_fps, s.restart_count, "
+                    "src.source_type FROM sessions AS s LEFT JOIN sources AS src "
+                    "ON src.id=s.source_id WHERE s.status IN "
+                    "('queued', 'processing', 'paused', 'stopping') "
+                    "ORDER BY s.created_at ASC"
                 )
-                .scalars()
-                .all()
+            ).mappings().all()
+
+        uploads_dir = settings.data_dir / "uploads"
+        sessions_dir = settings.data_dir / "sessions"
+        for row in rows:
+            session_id = str(row["id"])
+            candidates = [
+                path for path in uploads_dir.glob(f"{session_id}.*")
+                if path.is_file() and path.suffix.lower() in VIDEO_SUFFIXES
+            ]
+            retry_count = int(row["restart_count"] or 0)
+            can_resume = (
+                (row["source_type"] or "video") == "video"
+                and bool(candidates)
+                and retry_count < 1
+                and len(resumed) < settings.max_concurrent_sessions
             )
-            if rows:
-                connection.execute(
-                    text(
-                        "UPDATE sessions SET status = 'failed', ended_at = :ended_at, "
-                        "error = :error "
-                        "WHERE status IN ('queued', 'processing', 'paused', 'stopping')"
+            result_path = sessions_dir / session_id / "results.jsonl"
+            if can_resume:
+                fps = float(row["analysis_fps"] or settings.analysis_fps)
+                created_at = row["created_at"]
+                if isinstance(created_at, datetime):
+                    created_at = created_at.isoformat()
+                state = SessionState(
+                    id=session_id,
+                    filename=candidates[0].name,
+                    status="queued",
+                    created_at=str(created_at),
+                    uploaded_bytes=candidates[0].stat().st_size,
+                    analysis_fps=fps,
+                    error=(
+                        "The API restarted during analysis. RodAI is restarting this video "
+                        "from the beginning."
                     ),
-                    {
-                        "ended_at": datetime.now(UTC),
-                        "error": (
-                            "Processing was interrupted when the API restarted. "
-                            "Check the API service logs, then start a new analysis."
-                        ),
-                    },
                 )
-        for session_id in rows:
-            (settings.data_dir / "sessions" / str(session_id) / "results.jsonl").unlink(
-                missing_ok=True
-            )
+                result_path.unlink(missing_ok=True)
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "UPDATE sessions SET status='queued', ended_at=NULL, error=NULL, "
+                            "restart_count=restart_count+1 WHERE id=:id"
+                        ),
+                        {"id": session_id},
+                    )
+                registry.add(state, settings.max_concurrent_sessions)
+                resumed.append((state, candidates[0]))
+            else:
+                result_path.unlink(missing_ok=True)
+                if (row["source_type"] or "video") != "video":
+                    error = (
+                        "The live camera session ended when the API restarted. "
+                        "Start the camera again."
+                    )
+                elif not candidates:
+                    error = (
+                        "Analysis was interrupted and the saved video is unavailable. "
+                        "Upload it again to retry."
+                    )
+                elif retry_count >= 1:
+                    error = (
+                        "Analysis was interrupted again after an automatic restart. "
+                        "Start a new analysis or check the local API logs."
+                    )
+                else:
+                    error = (
+                        "Another video is already being recovered. Start this analysis "
+                        "again when it finishes."
+                    )
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "UPDATE sessions SET status='failed', ended_at=:ended_at, error=:error "
+                            "WHERE id=:id"
+                        ),
+                        {"id": session_id, "ended_at": datetime.now(UTC), "error": error},
+                    )
         incoming_dir = settings.data_dir / ".incoming"
         if incoming_dir.is_dir():
             for upload_path in incoming_dir.iterdir():
                 if upload_path.is_file():
                     upload_path.unlink(missing_ok=True)
-        if rows:
-            logger.warning("Marked %s interrupted video session(s) as failed", len(rows))
+        if resumed:
+            logger.warning("Queued %s interrupted video session(s) for restart", len(resumed))
+        failed_count = len(rows) - len(resumed)
+        if failed_count:
+            logger.warning("Marked %s interrupted session(s) as failed", failed_count)
     except Exception:
         logger.exception("Could not recover interrupted video sessions")
+    return resumed
+
+
+async def resume_interrupted_sessions(
+    settings: Settings,
+    engine: Engine,
+    registry: SessionRegistry,
+    sessions: list[tuple[SessionState, Path]],
+) -> None:
+    """Resume queued local uploads sequentially to preserve the concurrency limit."""
+    for state, upload_path in sessions:
+        logger.info("Restarting interrupted video from frame zero session_id=%s", state.id)
+        await asyncio.to_thread(
+            _process_video,
+            engine,
+            settings,
+            registry,
+            state.id,
+            upload_path,
+            settings.data_dir / "sessions" / state.id / "results.jsonl",
+            analysis_fps=state.analysis_fps or settings.analysis_fps,
+        )
 
 
 def _process_video(
@@ -963,7 +1062,7 @@ def _process_video(
     analysis_fps: float,
 ) -> None:
     try:
-        registry.update(session_id, status="processing")
+        registry.update(session_id, status="processing", error=None)
         with engine.begin() as connection:
             connection.execute(
                 text("UPDATE sessions SET status = 'processing' WHERE id = :id"),

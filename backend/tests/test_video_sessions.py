@@ -12,7 +12,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
 from rodai.config import Settings
-from rodai.sessions import SessionControl, make_sessions_router
+from rodai.sessions import (
+    SessionControl,
+    SessionRegistry,
+    make_sessions_router,
+    recover_interrupted_sessions,
+)
 from rodai.video_pipeline import process_video
 
 
@@ -27,7 +32,8 @@ def session_client(tmp_path: Path) -> tuple[TestClient, Path]:
         connection.exec_driver_sql(
             "CREATE TABLE sessions (id VARCHAR(36) PRIMARY KEY, source_id VARCHAR(36), "
             "status VARCHAR(32) NOT NULL, created_at DATETIME NOT NULL, ended_at DATETIME, "
-            "camera_config JSON, error TEXT)"
+            "camera_config JSON, error TEXT, analysis_fps FLOAT, "
+            "restart_count INTEGER NOT NULL DEFAULT 0)"
         )
         connection.exec_driver_sql(
             "CREATE TABLE session_results (id VARCHAR(36) PRIMARY KEY, session_id VARCHAR(36), "
@@ -201,6 +207,64 @@ def test_session_control_pauses_resumes_and_stops_cleanly() -> None:
     control.pause()
     control.stop()
     assert not control.should_continue()
+
+
+def test_recovery_requeues_interrupted_video_once_from_retained_upload(
+    tmp_path: Path,
+) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'recovery.sqlite'}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE sources (id VARCHAR(36) PRIMARY KEY, source_type VARCHAR(32), "
+            "created_at DATETIME NOT NULL)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE sessions (id VARCHAR(36) PRIMARY KEY, source_id VARCHAR(36), "
+            "status VARCHAR(32) NOT NULL, created_at DATETIME NOT NULL, ended_at DATETIME, "
+            "camera_config JSON, error TEXT, analysis_fps FLOAT, "
+            "restart_count INTEGER NOT NULL DEFAULT 0)"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO sources (id, source_type, created_at) "
+            "VALUES ('source-id', 'video', CURRENT_TIMESTAMP)"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO sessions (id, source_id, status, created_at, analysis_fps) "
+            "VALUES ('session-id', 'source-id', 'processing', CURRENT_TIMESTAMP, 3.5)"
+        )
+    upload = tmp_path / "uploads" / "session-id.mp4"
+    upload.parent.mkdir()
+    upload.write_bytes(b"retained video")
+    results = tmp_path / "sessions" / "session-id" / "results.jsonl"
+    results.parent.mkdir(parents=True)
+    results.write_text("partial output", encoding="utf-8")
+    registry = SessionRegistry()
+
+    recovered = recover_interrupted_sessions(Settings(data_dir=tmp_path), engine, registry)
+
+    assert len(recovered) == 1
+    state, recovered_upload = recovered[0]
+    assert recovered_upload == upload
+    assert state.status == "queued"
+    assert state.analysis_fps == 3.5
+    assert registry.get("session-id") is state
+    assert not results.exists()
+    with engine.connect() as connection:
+        row = connection.exec_driver_sql(
+            "SELECT status, restart_count, error FROM sessions WHERE id='session-id'"
+        ).one()
+    assert row == ("queued", 1, None)
+
+    # A second restart does not retry indefinitely.
+    again = recover_interrupted_sessions(Settings(data_dir=tmp_path), engine, SessionRegistry())
+    assert again == []
+    with engine.connect() as connection:
+        row = connection.exec_driver_sql(
+            "SELECT status, restart_count, error FROM sessions WHERE id='session-id'"
+        ).one()
+    assert row[0] == "failed" and row[1] == 1
+    assert "interrupted again" in row[2]
+    engine.dispose()
 
 
 def test_browser_camera_stream_echoes_frame_ids_and_exports_results(

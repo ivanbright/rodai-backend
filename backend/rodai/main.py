@@ -11,7 +11,12 @@ from rodai.config import get_settings
 from rodai.database import create_database_engine
 from rodai.health import build_health
 from rodai.retention import sweep_expired_artifacts
-from rodai.sessions import make_sessions_router, recover_interrupted_sessions
+from rodai.sessions import (
+    make_sessions_router,
+    recover_interrupted_sessions,
+    resume_interrupted_sessions,
+    session_registry,
+)
 
 settings = get_settings()
 
@@ -43,7 +48,10 @@ engine = create_database_engine(settings)
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     logger.info("RodAI backend starting environment=%s", settings.environment)
-    recover_interrupted_sessions(settings, engine)
+    recoveries = recover_interrupted_sessions(settings, engine, session_registry)
+    recovery_task = asyncio.create_task(
+        resume_interrupted_sessions(settings, engine, session_registry, recoveries)
+    )
 
     async def expiry_loop() -> None:
         while True:
@@ -60,8 +68,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     retention_task = asyncio.create_task(expiry_loop())
     yield
     retention_task.cancel()
+    recovery_task.cancel()
     try:
         await retention_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await recovery_task
     except asyncio.CancelledError:
         pass
     engine.dispose()
@@ -76,7 +89,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
-app.include_router(make_sessions_router(settings, engine))
+app.include_router(make_sessions_router(settings, engine, session_registry))
 
 
 @app.get("/api/v1/health", tags=["health"])
