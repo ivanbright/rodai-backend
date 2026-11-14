@@ -1,34 +1,38 @@
 # RodAI
 
-RodAI is a local-first road perception and movement analysis laboratory. Its outputs are experimental, may be wrong, and must not be used as the sole basis for safety-critical or enforcement decisions. Accident prediction is not implemented.
+RodAI is a local-first road perception and simulation laboratory. Its outputs are experimental and must not be used as the sole basis for safety-critical or enforcement decisions. It does not provide validated accident prediction or real-world crash prevention.
 
 ## Current status
 
-Phase 3 detector integration is in progress. Docker Compose configures a pinned DETR ResNet-50 CPU model. Uploaded videos receive frame-aligned vehicle/person detections and the browser overlays them on playback; camera streams have configurable capture size/quality and live boxes. A first inference downloads model weights into the persistent `rodai_data` volume. Tracking, crash prediction and target-region validation are not implemented.
+The local demo has two workspaces: a **Simulation lab** with three repeatable scripted road-conflict scenes, a rule-based risk countdown, and a simulated braking response; and **Video analysis**, which runs a pinned CPU DETR object detector on uploaded video. The simulation is synthetic ground-truth logic, not a trained model or evaluation of camera perception. The video detector identifies common road-user objects; it does not track them or predict accidents.
+
+See [Phase 4](docs/handovers/phase-4.md) for the simulation-library direction and current limits, and [Phase 3](docs/handovers/phase-3.md) for detector evidence.
 
 ## Requirements
 
 - Docker Desktop with Linux containers and Docker Compose v2.
 - A supported Python 3.12 runtime for backend development outside containers.
 - Node.js 22 LTS for frontend development outside containers.
-- Enough disk for Docker images, PostgreSQL data and later model weights. Hardware and minimum capacity have not yet been benchmarked.
+- Enough disk for Docker images, PostgreSQL data and model weights. Hardware performance remains unbenchmarked.
 
 ## Run locally
 
-1. Copy `.env.example` to `.env` and adjust local settings if needed. Never use the example secret for a shared deployment.
-2. Run `docker compose up --build` from the repository root.
-3. Open `http://localhost:5173` for the Vite development viewer or `http://localhost:8000/api/v1/health` for backend health.
-4. Apply database migrations explicitly with `docker compose run --rm rodai-api alembic upgrade head` before creating sessions. The current schema is `0002_retention`.
-5. Process an owner-provided video with documented usage rights. The first inference downloads and caches the configured detector weights; later runs reuse that cache. Check `/api/v1/health` for detector readiness.
+From the repository root, start the local stack:
 
-Local containers use PostgreSQL to match the deployment engine. The Vite server proxies `/api` to FastAPI. The backend serves the production frontend build from the same origin.
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
 
-## Tests and quality checks
+Open `http://localhost:5173`. Choose **Simulation lab** to run controlled scenarios, or **Video analysis** to process a local MP4, MOV, MKV, WebM or AVI. The Compose override publishes the API on port 8001 because the default API host port may be occupied by another local service. API health is at `http://localhost:8001/api/v1/health`.
 
-Run `scripts/run-tests.ps1` from PowerShell. Backend tests use pytest; frontend tests use Vitest. Run backend lint with `docker compose run --rm rodai-api ruff check .` and the frontend lint script with `docker compose run --rm rodai-frontend npm run lint`.
+The first video-analysis inference downloads and caches pinned model weights into the persistent `rodai_data` volume. Synthetic lab scenarios do not require an internet download or model weights.
 
-Synthetic pipeline tests do not validate detector accuracy. Phase 2 conformance and Phase 3 implementation status are recorded in `docs/handovers/phase-2.md` and `docs/handovers/phase-3.md`; see `docs/MODEL_PROVENANCE.md` for model and data source notes.
+Local Compose uses PostgreSQL. The frontend proxies `/api` to FastAPI; the production API image also serves the built frontend.
+
+## Quality checks
+
+Run `scripts/run-tests.ps1` from PowerShell. Backend tests use pytest; frontend tests use Vitest. Backend lint can be run with `docker compose run --rm rodai-api ruff check .`; frontend lint with `docker compose run --rm rodai-frontend npm run lint`. Synthetic scenario outcomes do not validate real-world perception accuracy.
 
 ## Configuration and deployment
 
-See [Docker and Compose](docs/docker.md), [deployment](docs/deployment.md), [security](docs/security.md), [privacy](docs/privacy.md), and [licences](docs/licences.md). Railway deployment is a separate Phase 1B gate; do not expose this foundation build publicly before authentication, privacy, licensing, quotas and secrets are configured.
+See `docs/docker.md`, `docs/deployment.md`, `docs/security.md`, `docs/privacy.md`, and `docs/licences.md`. Railway deployment is a separate approval gate; do not expose the service publicly before authentication, privacy, licensing, quotas and secrets are resolved.

@@ -41,3 +41,7 @@ Then open `http://localhost:5173`, choose an MP4, MOV, MKV, WebM or AVI video, p
 - The React overlay path is implemented and result retrieval was observed in API logs, but the UI could not be screenshot-verified in this session because the computer/browser-control service was unavailable. Recheck the visible overlay during the next interactive review.
 - Face/plate blurring, tracking, event detection, model evaluation on a labeled target sample, deployment, authentication and product design from the owner?s references remain future work. Phase 5 design references must be reviewed before design implementation.
 - Model licensing notes are technical provenance, not a legal determination. See [MODEL_PROVENANCE.md](../MODEL_PROVENANCE.md).
+
+## Next step: simulation lab
+
+The first controlled-scenario lab is recorded in `phase-4.md`. It demonstrates scripted conflict scenarios and a rule-based intervention flow independently of camera detection. The lab is not accident-prediction model evidence.
