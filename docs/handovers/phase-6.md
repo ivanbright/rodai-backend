@@ -1,14 +1,14 @@
 # RodAI Phase 6 Handover - Useful Video Results
 
 Date: 2026-11-14  
-Status: **Video-analysis experience updated to prioritize an annotated video and explain startup/stopped states. A 60-second local upload completed at 2 analyzed samples per second. Browser-rendered export still needs visual confirmation.**
+Status: **Video-analysis experience now restores the latest saved road-video session with its source clip and on-page annotations. A 60-second local upload completed at 2 analyzed samples per second. Browser-rendered export still needs visual confirmation.**
 
 ## User workflow now
 
-1. Select a road video and choose an analysis sampling rate. The local default is 2 model frames per second; 1 FPS is quicker, while 5 or 10 FPS takes longer on CPU and gives denser samples.
+1. The app opens into Video analysis and reopens the latest saved road-video session when available. Select a road video and choose an analysis sampling rate to start another session. The local default is 2 model frames per second; 1 FPS is quicker, while 5 or 10 FPS takes longer on CPU and gives denser samples.
 2. On first run, the detector may need to download or load its model. The UI explains this state. It shows the number of analyzed samples, not the total source frame count.
-3. When results are ready, play the source preview with track boxes, IDs and trails aligned to analyzed timestamps. Review the observed track-ID counts and class mix.
-4. Use **Save annotated video (.webm)** to render the browser-local source video and overlays into a downloadable video. For a stopped session, the export ends at its last analyzed timestamp.
+3. When results are ready, play the source preview in the page with track boxes, IDs and trails aligned to analyzed timestamps. Saved sessions restore the uploaded clip from the local API so the viewer survives a page refresh.
+4. Optionally use **Export annotated video (.webm)** to render the in-page result into a shareable file. Watching the analysis does not require exporting it. For a stopped session, the export ends at its last analyzed timestamp.
 5. Expand **Technical data for developers** only when frame-level JSONL is needed. It is machine-readable data for debugging or integrations, not the normal viewing result.
 
 ## Zero-frame stop diagnosis
@@ -23,7 +23,8 @@ The upload API accepts `analysis_fps` from 1 to 15. Its configurable default is 
 
 - TypeScript production build and frontend lint passed; backend Python compilation passed. No automated tests were run.
 - The rebuilt Docker API and database are healthy. The user-uploaded 60.1-second, 1280 × 720, 30 FPS clip completed with 120 analyzed samples at 2 FPS; every analyzed sample contained detections. This is a pipeline smoke check, not an accuracy or representative-footage acceptance result.
+- `GET /api/v1/sessions/{id}/video` returns the retained original upload as inline MP4, enabling saved-session playback in the page until the configured upload retention expires.
 - The upload path initially raised an unbound-local error while scheduling the background task. Fixed in commit `e52bb6d`; re-uploading the same local clip then completed successfully.
-- Browser automation was unavailable in this environment. Open the completed recent session in the browser, confirm the video overlay, use **Save annotated video (.webm)**, and check the downloaded file's playback.
+- Browser automation was unavailable in this environment. The Vite server now serves the updated player module, and the API video endpoint returned the original MP4 with byte-range support. Confirm the inline overlay visually in the user's browser and exercise **Export annotated video (.webm)** there.
 - Confirm audio preservation and codec compatibility in the target browser. If browser recording is unsupported, the app gives an error and keeps the annotated in-page preview available.
 - Track IDs showed substantial fragmentation in this smoke clip; do not present track counts or identity stability as validated. The pinned detector/tracker still do not detect or predict accidents. Representative footage, labeled evaluation, hardware benchmarks, CCTV ingest, calibration, privacy review and incident logic remain future work.

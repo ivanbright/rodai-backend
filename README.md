@@ -4,7 +4,7 @@ RodAI is being built to analyze real road-camera video and provide road-safety i
 
 ## Current status
 
-The local demo includes **Video analysis**, which runs the pinned CPU DETR detector and prototype tracker on uploaded video. Choose a sampling rate, review IDs and trails over the video, see a track summary, then save an annotated WebM. The JSONL frame log is available under technical details for developers. A separate scripted SVG simulation workspace remains a limited software demo, not CCTV validation. See the [product roadmap](docs/PRODUCT_VISION.md), [Phase 5 tracking limits](docs/handovers/phase-5.md), and [Phase 6 user workflow](docs/handovers/phase-6.md).
+The local demo opens into **Video analysis**, which runs the pinned CPU DETR detector and prototype tracker on uploaded video. The analysis appears over the video in the page; export to WebM is optional. The JSONL frame log is available under technical details for developers. A separate scripted SVG simulation workspace remains a limited software demo, not CCTV validation. See the [product roadmap](docs/PRODUCT_VISION.md), [Phase 5 tracking limits](docs/handovers/phase-5.md), and [Phase 6 user workflow](docs/handovers/phase-6.md).
 
 See [Product Vision](docs/PRODUCT_VISION.md) for the intended real-video product, build sequence and measurable acceptance evidence. See [Phase 3](docs/handovers/phase-3.md) for detector evidence and [Phase 4](docs/handovers/phase-4.md) for the scripted demonstration's limits.
 
@@ -23,7 +23,7 @@ From the repository root, start the local stack:
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
-Open `http://localhost:5173` and choose **Video analysis** to process a local MP4, MOV, MKV, WebM or AVI. The default is 2 analyzed frames per second; higher rates take longer on CPU and sparse sampling can miss fast events. Wait for the first analyzed frame before stopping. When processing completes, play the annotated preview and use **Save annotated video (.webm)**. The JSONL link is in **Technical data for developers**. The Compose override publishes the API on port 8001 because the default API host port may be occupied by another local service. API health is at `http://localhost:8001/api/v1/health`.
+Open `http://localhost:5173` to process a local MP4, MOV, MKV, WebM or AVI. The latest saved video session reopens in the page with its annotated playback. The default is 2 analyzed frames per second; higher rates take longer on CPU and sparse sampling can miss fast events. Wait for the first analyzed frame before stopping. Export an annotated WebM only if you need a shareable file; the JSONL link is in **Technical data for developers**. The Compose override publishes the API on port 8001 because the default API host port may be occupied by another local service. API health is at `http://localhost:8001/api/v1/health`.
 
 The first video-analysis inference downloads and caches pinned model weights into the persistent `rodai_data` volume. Synthetic lab scenarios do not require an internet download or model weights.
 

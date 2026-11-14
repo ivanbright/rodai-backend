@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import math
+import mimetypes
 import shutil
 import threading
 import time
@@ -603,6 +604,32 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             row["created_at"],
             row["source_type"] or "video",
             row["camera_config"],
+        )
+
+    @router.get("/{session_id}/video")
+    def get_session_video(session_id: str) -> FileResponse:
+        parsed_id = _parse_id(session_id)
+        with engine.connect() as connection:
+            source_type = connection.execute(
+                text(
+                    "SELECT src.source_type FROM sessions AS s "
+                    "LEFT JOIN sources AS src ON src.id = s.source_id WHERE s.id = :id"
+                ),
+                {"id": parsed_id},
+            ).scalar_one_or_none()
+        if source_type is None:
+            raise HTTPException(404, "Session not found.")
+        if source_type != "video":
+            raise HTTPException(404, "This session has no uploaded video.")
+        video_paths = list(uploads_dir.glob(f"{parsed_id}.*"))
+        if not video_paths or not video_paths[0].is_file():
+            raise HTTPException(404, "The uploaded video has expired or is unavailable.")
+        video_path = video_paths[0]
+        media_type = mimetypes.guess_type(video_path.name)[0] or "application/octet-stream"
+        return FileResponse(
+            video_path,
+            media_type=media_type,
+            content_disposition_type="inline",
         )
 
     @router.post("/{session_id}/pause")
