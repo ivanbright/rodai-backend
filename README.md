@@ -4,7 +4,7 @@ RodAI is a local-first road perception and simulation laboratory. Its outputs ar
 
 ## Current status
 
-The local demo has two workspaces: a **Simulation lab** with three repeatable scripted road-conflict scenes, a rule-based risk countdown, and a simulated braking response; and **Video analysis**, which runs a pinned CPU DETR object detector on uploaded video. The simulation is synthetic ground-truth logic, not a trained model or evaluation of camera perception. The video detector identifies common road-user objects; it does not track them or predict accidents.
+The local demo has two workspaces: a **Simulation lab** with three repeatable scripted road-conflict scenes, a rule-based risk countdown, simulated braking, and an optional live DETR pass on generated frames; and **Video analysis**, which runs the pinned CPU DETR object detector on uploaded video. The simulation is synthetic ground-truth logic, not a trained accident-prediction model. Its risk index ignores detector boxes; the video detector identifies common road-user objects but does not track them or predict accidents.
 
 See [Phase 4](docs/handovers/phase-4.md) for the simulation-library direction and current limits, and [Phase 3](docs/handovers/phase-3.md) for detector evidence.
 

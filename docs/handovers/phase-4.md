@@ -11,17 +11,19 @@ Open `http://localhost:5173` and choose **Simulation lab**. The lab currently co
 2. Pedestrian entering a marked crossing.
 3. Two vehicles approaching an intersection conflict zone.
 
-Each scene advances in real time. It displays agent IDs and boxes, a time-to-conflict countdown, a rule-based risk indicator, and an optional simulated braking response. Turn braking off to let the scripted scenario reach its impact point. Reset or select another scenario to replay. **Video analysis** remains available as a separate workspace.
+Each scene advances in real time. It displays scripted agent IDs and boxes, a time-to-conflict countdown, a rule-based risk index, and an optional simulated braking response. Turn braking off to let the scripted scenario reach its impact point. Reset or select another scenario to replay. **Video analysis** remains available as a separate workspace.
+
+The optional **Run detector on these frames** control rasterizes the current SVG scene and streams it to the existing live DETR endpoint. Returned DETR boxes are overlaid in a separate color; frame and detected-object counts are displayed. This inference path is implemented, but the live synthetic-frame WebSocket flow was not end-to-end verified in this session.
 
 ## How to interpret it
 
-The current scenarios are deterministic scripts with known paths and event times. The displayed risk value is a demonstrator score derived from the scenario countdown; it is not calibrated probability. Agents are rendered from scenario state, so no camera detector, tracker, learned motion model, or accident-prediction model is being evaluated here. The “impact avoided” result means the scripted braking rule changed the simulated agent path before the scripted conflict point. It does not demonstrate prevention in real traffic.
+The current scenarios are deterministic scripts with known paths and event times. The displayed risk index is a demonstrator score derived from the scenario countdown; it is not calibrated probability. Optional DETR detections are real model outputs on simple, hand-drawn vector frames, but they do not feed the risk index or braking rule. The lab has no tracker or learned motion model. The “simulated conflict avoided” result means the scripted braking rule changed the simulated agent path before the scripted conflict point. It does not demonstrate prevention in real traffic.
 
-## Test-library direction
+## Scenario manifest
 
-The next increment should turn the three hand-authored scenes into a versioned scenario library. Each case should define road geometry, camera view, actor identities and classes, timestamped ground-truth trajectories, conflict zones, event timing, expected alerts, and expected outcomes. Use fixed random seeds for repeatable runs and record scenario/version, model/version, configuration, output events and metrics per run.
+The first versioned manifest is `frontend/src/scenarios/road-conflicts.v1.json` (`rodai.scenario-library.v1`, library version `1.0.0`). It records three cases, scene layout, coordinate space and update rate, scripted actor identities/classes/roles/paths, time-to-conflict, conflict point, and expected outcomes with/without the simulated response. The UI renders each manifest scene and can pass those rendered frames through DETR. This is a small, hand-authored test bank; it has no randomized variants, photorealistic rendered camera frames, or persistent run records yet.
 
-Proposed scenario families: following-distance and sudden braking; pedestrian and cyclist crossings; uncontrolled and signalized intersections; turning conflicts; low-light, rain, occlusion and camera-placement variants; and safe non-conflict controls to measure false alarms. Synthetic variants must be marked synthetic and kept distinct from permissioned recorded footage.
+Next expand it with following-distance and sudden-braking variants; pedestrian and cyclist crossings; uncontrolled and signalized intersections; turning conflicts; low-light, rain, occlusion and camera-placement variants; and safe non-conflict controls to measure false alarms. Add fixed random seeds for generated variants and record scenario/version, model/version, configuration, output events and metrics per run. Synthetic variants must remain marked synthetic and distinct from permissioned recorded footage.
 
 ## Planned model and evaluation path
 
@@ -36,11 +38,11 @@ Scenario labels provide supervised examples; the model does not automatically tr
 
 ## Current scope and next acceptance gates
 
-- Delivered: three selectable animated scenes, deterministic countdown, conflict warning, simulated braking toggle, impact/avoidance outcome, clear synthetic/rule-based disclosure, and a separate video-analysis tab.
-- Remaining for a richer lab: configurable scene builder, versioned scenario manifests, scenario persistence/run history, frame and ground-truth export, varied camera/weather/lighting/occlusion rendering, realistic agent dynamics, and evaluation dashboards.
+- Delivered: three selectable animated scenes, a versioned scenario manifest, deterministic countdown, conflict warning, simulated braking toggle, optional live DETR inference on rendered frames with a separate detection overlay, impact/avoidance outcome, clear synthetic/rule-based disclosure, and a separate video-analysis tab.
+- Remaining for a richer lab: configurable scene builder, scenario persistence/run history, frame and ground-truth export, varied camera/weather/lighting/occlusion rendering, realistic agent dynamics, and evaluation dashboards.
 - Remaining perception work: connect rendered frames to the actual detector; tracking with stable IDs; trajectory estimation; event logic based on observed model output rather than hidden ground truth; reviewed alert thresholds; and measured false-positive/false-negative behavior.
 - A simulation result is not evidence of real-world accuracy. Benchmarks still require actual hardware and representative permissioned footage. No operational deployment or accident-prevention claim is authorized by this prototype.
 
 ## Verification
 
-`npm run build` passed after the simulation workspace was added. Screenshot verification was unavailable because the browser-control service could not connect in this session; confirm the rendered layout at the local demo URL during interactive review.
+`npm run build` and `npm run lint` passed after the simulation workspace and optional detector stream were added. The local Vite page and transformed simulation module return HTTP 200. Screenshot verification and the live synthetic-frame WebSocket flow were unavailable because the browser-control service could not connect in this session; verify them during interactive review.
