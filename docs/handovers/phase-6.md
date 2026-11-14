@@ -1,7 +1,7 @@
 # RodAI Phase 6 Handover - Useful Video Results
 
 Date: 2026-11-14  
-Status: **Video-analysis experience updated to prioritize an annotated video and explain startup/stopped states. The browser-rendered export and sampled API path compile, but still need an interactive upload/export review.**
+Status: **Video-analysis experience updated to prioritize an annotated video and explain startup/stopped states. A 60-second local upload completed at 2 analyzed samples per second. Browser-rendered export still needs visual confirmation.**
 
 ## User workflow now
 
@@ -21,8 +21,9 @@ The upload API accepts `analysis_fps` from 1 to 15. Its configurable default is 
 
 ## Verification and remaining work
 
-- TypeScript production build and frontend lint are the available checks for this change; no automated tests were run.
-- A Docker rebuild and live endpoint health check are still required after these edits.
-- Run a permitted clip through the new 2 FPS flow, verify IDs/timestamps, export the WebM, and check playback in the user's browser.
+- TypeScript production build and frontend lint passed; backend Python compilation passed. No automated tests were run.
+- The rebuilt Docker API and database are healthy. The user-uploaded 60.1-second, 1280 × 720, 30 FPS clip completed with 120 analyzed samples at 2 FPS; every analyzed sample contained detections. This is a pipeline smoke check, not an accuracy or representative-footage acceptance result.
+- The upload path initially raised an unbound-local error while scheduling the background task. Fixed in commit `e52bb6d`; re-uploading the same local clip then completed successfully.
+- Browser automation was unavailable in this environment. Open the completed recent session in the browser, confirm the video overlay, use **Save annotated video (.webm)**, and check the downloaded file's playback.
 - Confirm audio preservation and codec compatibility in the target browser. If browser recording is unsupported, the app gives an error and keeps the annotated in-page preview available.
-- The pinned detector/tracker still do not detect or predict accidents. Representative footage, labeled evaluation, hardware benchmarks, CCTV ingest, calibration, privacy review and incident logic remain future work.
+- Track IDs showed substantial fragmentation in this smoke clip; do not present track counts or identity stability as validated. The pinned detector/tracker still do not detect or predict accidents. Representative footage, labeled evaluation, hardware benchmarks, CCTV ingest, calibration, privacy review and incident logic remain future work.
