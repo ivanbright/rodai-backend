@@ -144,7 +144,8 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
         with engine.connect() as connection:
             rows = connection.execute(
                 text(
-                    "SELECT s.id, s.status, s.created_at, s.camera_config, src.source_type "
+                    "SELECT s.id, s.status, s.created_at, s.camera_config, s.error, "
+                    "src.source_type "
                     "FROM sessions AS s LEFT JOIN sources AS src ON src.id = s.source_id "
                     "ORDER BY s.created_at DESC LIMIT :limit"
                 ),
@@ -165,6 +166,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                         row["created_at"],
                         row["source_type"] or "video",
                         row["camera_config"],
+                        row["error"],
                     )
                 )
         return items
@@ -556,7 +558,13 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                 error=failure_message,
             )
             try:
-                _update_session_status(engine, parsed_id, final_status, ended=True)
+                _update_session_status(
+                    engine,
+                    parsed_id,
+                    final_status,
+                    ended=True,
+                    error=failure_message,
+                )
             except Exception:
                 logger.exception(
                     "Could not persist browser session status session_id=%s", parsed_id
@@ -586,7 +594,8 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             row = (
                 connection.execute(
                     text(
-                        "SELECT s.id, s.status, s.created_at, s.camera_config, src.source_type "
+                        "SELECT s.id, s.status, s.created_at, s.camera_config, s.error, "
+                        "src.source_type "
                         "FROM sessions AS s LEFT JOIN sources AS src ON src.id = s.source_id "
                         "WHERE s.id = :id"
                     ),
@@ -604,6 +613,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             row["created_at"],
             row["source_type"] or "video",
             row["camera_config"],
+            row["error"],
         )
 
     @router.get("/{session_id}/video")
@@ -769,6 +779,7 @@ def _persisted_session(
     created_at: datetime | str,
     source_type: str = "video",
     camera_config: str | dict[str, Any] | None = None,
+    error: str | None = None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
         "id": session_id,
@@ -781,7 +792,7 @@ def _persisted_session(
         "analysis_fps": None,
         "dropped_frames": 0,
         "metadata": None,
-        "error": None,
+        "error": error,
         "result_url": f"/api/v1/sessions/{session_id}/results",
     }
     if camera_config:
@@ -875,14 +886,23 @@ def _delete_session_records(engine: Engine, session_id: str) -> None:
 
 
 def _update_session_status(
-    engine: Engine, session_id: str, session_status: str, *, ended: bool = False
+    engine: Engine,
+    session_id: str,
+    session_status: str,
+    *,
+    ended: bool = False,
+    error: str | None = None,
 ) -> None:
     with engine.begin() as connection:
         connection.execute(
-            text("UPDATE sessions SET status = :status, ended_at = :ended_at WHERE id = :id"),
+            text(
+                "UPDATE sessions SET status = :status, ended_at = :ended_at, error = :error "
+                "WHERE id = :id"
+            ),
             {
                 "status": session_status,
                 "ended_at": datetime.now(UTC) if ended else None,
+                "error": error,
                 "id": session_id,
             },
         )
@@ -905,10 +925,17 @@ def recover_interrupted_sessions(settings: Settings, engine: Engine) -> None:
             if rows:
                 connection.execute(
                     text(
-                        "UPDATE sessions SET status = 'failed', ended_at = :ended_at "
+                        "UPDATE sessions SET status = 'failed', ended_at = :ended_at, "
+                        "error = :error "
                         "WHERE status IN ('queued', 'processing', 'paused', 'stopping')"
                     ),
-                    {"ended_at": datetime.now(UTC)},
+                    {
+                        "ended_at": datetime.now(UTC),
+                        "error": (
+                            "Processing was interrupted when the API restarted. "
+                            "Check the API service logs, then start a new analysis."
+                        ),
+                    },
                 )
         for session_id in rows:
             (settings.data_dir / "sessions" / str(session_id) / "results.jsonl").unlink(
@@ -974,19 +1001,29 @@ def _process_video(
         result_path.unlink(missing_ok=True)
         with engine.begin() as connection:
             connection.execute(
-                text("UPDATE sessions SET status = 'failed', ended_at = :ended_at WHERE id = :id"),
-                {"id": session_id, "ended_at": datetime.now(UTC)},
+                text(
+                    "UPDATE sessions SET status = 'failed', ended_at = :ended_at, error = :error "
+                    "WHERE id = :id"
+                ),
+                {"id": session_id, "ended_at": datetime.now(UTC), "error": str(exc)},
             )
-    except Exception:
+    except Exception as exc:
         logger.exception("Video session failed session_id=%s", session_id)
+        failure = (
+            f"Video processing failed ({type(exc).__name__}). "
+            f"Check the API service logs for session {session_id}."
+        )
         registry.update(
             session_id,
             status="failed",
-            error="Video processing failed. Check the video file and try again.",
+            error=failure,
         )
         result_path.unlink(missing_ok=True)
         with engine.begin() as connection:
             connection.execute(
-                text("UPDATE sessions SET status = 'failed', ended_at = :ended_at WHERE id = :id"),
-                {"id": session_id, "ended_at": datetime.now(UTC)},
+                text(
+                    "UPDATE sessions SET status = 'failed', ended_at = :ended_at, error = :error "
+                    "WHERE id = :id"
+                ),
+                {"id": session_id, "ended_at": datetime.now(UTC), "error": failure},
             )
