@@ -4,7 +4,7 @@ RodAI is a local-first road perception and movement analysis laboratory. Its out
 
 ## Current status
 
-Phase 1 foundation only. The app reports actual API, PostgreSQL, device configuration and mounted data-volume status. Video ingestion, detection, tracking and model inference are unavailable until later approved phases.
+Phase 2 video and session pipeline is implemented. The app accepts local video uploads and browser-camera streams, decodes and records frame-aligned JSONL results, and supports session controls. Detection, tracking and model inference are not yet implemented; the app does not fabricate detections.
 
 ## Requirements
 
@@ -26,7 +26,7 @@ Local containers use PostgreSQL to match the deployment engine. The Vite server 
 
 Run `scripts/run-tests.ps1` from PowerShell. Backend tests use pytest; frontend tests use Vitest. Run backend lint with `docker compose run --rm rodai-api ruff check .` and the frontend lint script with `docker compose run --rm rodai-frontend npm run lint`.
 
-The local Compose stack has been verified with PostgreSQL, API and frontend containers; see `docs/handovers/phase-1.md` for the checks and remaining limitations.
+The local Compose stack has been verified with PostgreSQL, API and frontend containers. Phase 2 backend and frontend checks are recorded in `docs/handovers/phase-2.md`; see `docs/handovers/phase-1.md` for foundation checks and remaining limitations.
 
 ## Configuration and deployment
 

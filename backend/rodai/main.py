@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from rodai.config import get_settings
 from rodai.database import create_database_engine
 from rodai.health import build_health
+from rodai.sessions import make_sessions_router, recover_interrupted_sessions
 
 settings = get_settings()
 
@@ -35,6 +36,7 @@ engine = create_database_engine(settings)
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     logger.info("RodAI backend starting environment=%s", settings.environment)
+    recover_interrupted_sessions(settings, engine)
     yield
     engine.dispose()
     logger.info("RodAI backend stopped")
@@ -48,6 +50,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
+app.include_router(make_sessions_router(settings, engine))
 
 
 @app.get("/api/v1/health", tags=["health"])
