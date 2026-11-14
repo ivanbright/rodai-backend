@@ -173,6 +173,63 @@ Current Compose names are preserved: service/container `rodai-db`; configured da
 
 Architecture and owner decisions are documented; remaining questions are listed in `docs/QUESTIONS.md`. Hardware, representative permissioned samples, privacy-law application and Railway spend limit remain open facts/decisions. Phase 0 is **not approved and not marked complete**. Stop here and wait for the owner to review and send `APPROVED: Phase 0`.
 
+## Phase 0 closeout response — 2026-11-14
+
+The owner's latest response confirms the previously recorded decisions and adds the following refinements:
+
+- Railway hostname planning is `rodai.cursorclick.dev`; DNS provider is Cloudflare. Do not change DNS or purchase a domain without separate approval. Local Compose is the priority; no paid Railway provisioning/deploy before an explicit plan and monthly cap are approved.
+- Hardware confirmed so far: Windows machine, Intel processor, 32 GB RAM. Exact Windows edition/build, processor model, GPU/VRAM, CUDA/driver and free disk remain unverified. Keep CPU support mandatory; do not install GPU tooling or change drivers without approval.
+- No owner-provided sample collection is ready. Never use random or merely public footage as if licensed. Document provenance and usage rights before accepting a sample. Synthetic fixtures remain appropriate for deterministic pipeline mechanics, but they cannot satisfy representative footage quality acceptance.
+- Technical retention defaults are accepted (video 7 days, results/session history 30 days, stored exports 7 days, models/checkpoints until manually removed); these do not establish legal compliance. Rwanda privacy-law questions are listed in `docs/QUESTIONS.md`. Keep content private, make deletion auditable, and consider face/plate blur before external sharing.
+- Phase 2 must be brought into conformance before Phase 3: automatic expiry/deletion, configurable camera capture, one-session conflict behavior and live drop accounting. Test cases and measurable exit criteria follow below.
+
+### Candidate external smoke-test clip (not yet downloaded or accepted as target footage)
+
+Wikimedia Commons lists **“Bangalore 20220814 155101.webm”** by L. Shyamal as the creator's own work and dedicated under CC0 1.0. File-page metadata reports 2:07 duration, 1920x1080, 425.86 MB, WebM/VP9. The page offers a 720p transcode. It fits current upload size/duration and `.webm` format. It can be considered for local ingestion smoke testing after inspection for identifiable people/plates; do not put it in Git or use it as a Kigali quality sample. Candidate/source and licence: https://commons.wikimedia.org/wiki/File:Bangalore_20220814_155101.webm. No download has been made.
+
+### Railway cost estimate (planning only; USD, checked against Railway official pricing on 2026-11-14)
+
+Railway's current Hobby plan is $5/month and includes $5 of resource usage. The official listed container rates are $10 per GB-month RAM, $20 per vCPU-month, $0.15 per GB-month volume storage, and $0.05 per GB egress. Hobby currently lists a 5 GB volume limit. Railway bills for a running service's CPU/RAM even without traffic. This estimate excludes tax, exchange fees, model hosting/inference load and exceptional traffic.
+
+| Illustrative continuously-running local-demo deployment | RAM average (app + PostgreSQL) | CPU average (combined) | Volume | Monthly egress | Estimated resource usage / total Hobby bill |
+|---|---:|---:|---:|---:|---:|
+| Lower-use scenario | 0.5 GB | 0.05 vCPU | 5 GB | 10 GB | $7.25 |
+| Higher baseline scenario | 1.0 GB | 0.10 vCPU | 5 GB | 10 GB | $13.25 |
+
+Calculation example for higher baseline: RAM $10 + CPU $2 + volume $0.75 + egress $0.50 = $13.25 resource usage; the $5 Hobby subscription credit offsets the first $5, so estimated total is $13.25, not $18.25. These average resource sizes are unmeasured assumptions, not a quote. Detection CPU usage may be materially higher and must be measured locally; therefore keep inference local for now. At the 500 MB upload cap, a 5 GB volume holds at most 10 maximum-size originals before accounting for database/results/model files, so quotas and 7-day expiry are necessary. No plan is recommended or approved yet.
+
+Official pricing references: [Railway plan and resource rates](https://docs.railway.com/pricing/plans), [how Railway bills active services](https://docs.railway.com/pricing/understanding-your-bill).
+
+### Phase 2 conformance plan and acceptance criteria (before Phase 3)
+
+These items are planning requirements only. They must be implemented and verified in an approved phase; no present feature claim should imply they are already done.
+
+**Automatic retention and deletion**
+
+- Store policy and expiry timestamps for original uploads (7 days), session results/metadata (30 days), and server-held export artifacts (7 days); make retention values configurable through validated settings.
+- Run a scheduled expiry sweep at least hourly. An expired artifact is deleted within 60 minutes of its expiry under normal operation. The sweep records artifact type, internal ID, expiry, attempt time and outcome without logging frame content or secrets.
+- Remove the file first and delete its associated database records only after successful filesystem deletion. On failure, preserve/reconcile the record, log a structured failure, surface a real operational status, and retry on the next sweep. Missing files and orphan files are reported and handled idempotently.
+- Never remove a model/checkpoint referenced by an experiment or model-registry record; model artifacts remain until explicitly deleted after references are cleared.
+- Tests with a controllable clock cover not-yet-expired and just-expired records, each artifact class, linked-record deletion, retry after injected filesystem failure, orphan/missing files, idempotent repeated sweeps, and protection of referenced model files. Acceptance: all eligible expired records are handled; no unexpired or referenced model artifact is deleted; injected failures remain observable and retryable; audit outcome exists for every attempt.
+- A file downloaded by a user is outside RodAI's control and cannot be remotely deleted; explain that distinction in the export UX.
+
+**Configurable browser-camera capture**
+
+- Default maximum frame size is 1280x720. Preserve aspect ratio and downscale larger camera input; offer lower resolutions. Make JPEG quality configurable; proposed validated range is 0.50–0.95 with current 0.82 as default. Reject invalid/unsupported settings at session creation.
+- Frontend sends selected settings when creating a live session. Backend validates them and returns the effective settings in the session-start message; frontend uses those effective settings. Include effective dimensions and quality in session/frame metadata.
+- Tests cover default values, supported lower-resolution choices, invalid dimensions/quality, downscaling, settings negotiation, and exact frame/session metadata consistency. Acceptance: no transmitted frame exceeds 1280x720 by default; effective dimensions remain within the user-selected maximum; requested and acknowledged quality match; invalid settings receive a clear 4xx response.
+- Any setting above 1280x720 remains disabled until benchmarked on actual development hardware and approved. Record sustained FPS, per-frame latency, CPU/RAM and dropped-frame rate for the chosen resolution/quality before expanding caps.
+
+**Session cap and frame accounting**
+
+- Keep `RODAI_MAX_CONCURRENT_SESSIONS=1`. Tests attempt a second video while one is active and a camera while one is active; both receive HTTP 409 with a clear message. Verify a stopped/completed/failed session releases the slot and repeated starts cannot replace active work.
+- Live frames carry monotonically increasing IDs and `dropped_since_last`. Tests verify accepted frames preserve IDs/timestamps, dropped counts are reported exactly once and accumulated totals match; malformed or out-of-order frames are rejected. Offline video must process ordered frames without silently dropping any.
+- Acceptance: never more than one active session; every competing request receives an explicit conflict; live dropped-frame totals are visible in session detail/export; offline processed count equals decoded count unless a clearly reported error/stop terminates processing.
+
+### Sample-video metadata and acceptance policy
+
+For every candidate, record at minimum: source URL/creator; retrieval date/checksum; copyright licence and specific allowed use; permission/restrictions; recording location and camera/source type; context; duration; resolution; FPS; whether people/plates are identifiable; storage/retention; and whether the sample is for pipeline smoke, detector evaluation or target-region acceptance. The Bangalore CC0 file above is an optional pipeline smoke candidate only. Synthetic fixtures test deterministic mechanics. Representative detector-quality acceptance for the target remains blocked until permissioned Kigali/Rwanda footage is supplied and inspected.
+
 ## Addendum impact and revised implementation plan (original note)
 
 The addendum supersedes conflicting master-prompt rules. The approved target is now local-first inference with Docker packaging, Railway deployment, PostgreSQL persistence, CPU-only production inference, environment-variable configuration, and authentication for public access. Phase 1 now needs Dockerfiles, Compose, `.env.example`, Pydantic Settings, PostgreSQL/Alembic, and container tests. Phase 1B is a distinct Railway deployment gate. Every later phase must include Docker/Compose acceptance; deployment checks and Railway CPU measurements are added at the specified gates.

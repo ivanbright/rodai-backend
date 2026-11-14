@@ -27,3 +27,10 @@
 - Recorded the owner's Rwanda/Kigali target, privacy/retention defaults, commercial licensing constraint, isolated Python 3.12 environment, PostgreSQL requirement, transport/concurrency settings, Railway topology, invite-only access, planned domain, and deployment spending gate.
 - Updated Phase 0 architecture and remaining questions. The owner explicitly withheld Phase 0 approval; no new implementation phase is authorized.
 - Flagged current conformance gaps: automated retention and configurable 1280x720/JPEG capture controls are not implemented.
+
+## Unreleased — Phase 0 closeout requirements and cost model (2026-11-14)
+
+- Recorded the final owner responses on sample-footage handling, verified hardware facts, Cloudflare/domain planning, Railway cost gate, accepted retention defaults, and required Phase 2 conformance work.
+- Added a CC0 road-video smoke-test candidate with provenance/limitations; no media was downloaded or committed.
+- Added measurable acceptance criteria for expiry/deletion, camera settings, session concurrency and dropped-frame accounting, plus an illustrative Railway monthly cost model.
+- Phase 0 remains unapproved. No implementation phase or deployment was started.
