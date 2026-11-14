@@ -15,7 +15,7 @@ Status: **Prototype online tracking is wired into uploaded-video and browser-cam
 
 The tracker is a practical baseline built on detector boxes. It is not a trained re-identification model; similar objects can swap IDs, missed detections can split one physical object into multiple IDs, and close objects can merge in association. Track IDs are unique only inside one session. Pixel trails and velocity help inspect movement but do not provide metres, km/h, collision prediction, or accident prevention.
 
-The current DETR detector still processes every decoded upload frame. On CPU this may run slower than source playback. No throughput, latency, drop-rate or tracking-accuracy target has been measured. The browser-camera path is a local browser feed, not CCTV/RTSP ingestion.
+The upload path now samples inference at a selectable rate (default 2 FPS) while decoding the source video. This limits CPU model calls; it can miss fast events, and it is not a real-time performance claim. No throughput, latency, drop-rate or tracking-accuracy target has been measured. The browser-camera path is a local browser feed, not CCTV/RTSP ingestion.
 
 ## Acceptance still required
 

@@ -38,10 +38,11 @@ def process_video(
     *,
     session_id: str,
     max_video_seconds: int | None = None,
+    analysis_fps: float | None = None,
     should_continue: Callable[[], bool] | None = None,
     detect_frame: Callable[[Any], list[dict[str, Any]]] | None = None,
 ) -> tuple[VideoMetadata, int, bool]:
-    """Decode every frame in order and emit honest frame-echo records."""
+    """Decode in order and emit records for analyzed frames at the configured sample rate."""
     capture = cv2.VideoCapture(str(video_path))
     if not capture.isOpened():
         capture.release()
@@ -61,6 +62,8 @@ def process_video(
         stopped = False
         tracker = RoadObjectTracker()
         last_timestamp_ms: int | None = None
+        last_inference_timestamp_ms: int | None = None
+        analyzed_frames = 0
         while True:
             if should_continue is not None and not should_continue():
                 stopped = True
@@ -96,12 +99,26 @@ def process_video(
                 raise InvalidVideoError(
                     f"Video exceeds the {max_video_seconds} second duration limit."
                 )
+            due_for_inference = (
+                detect_frame is None
+                or analysis_fps is None
+                or timestamp_ms is None
+                or last_inference_timestamp_ms is None
+                or timestamp_ms - last_inference_timestamp_ms >= 1000 / analysis_fps
+            )
+            if not due_for_inference:
+                frame_id += 1
+                continue
+
             detections = detect_frame(frame) if detect_frame else []
             tracks = (
                 tracker.update(detections, timestamp_ms=timestamp_ms, frame_id=frame_id)
                 if detect_frame
                 else []
             )
+            analyzed_frames += 1
+            if detect_frame and timestamp_ms is not None:
+                last_inference_timestamp_ms = timestamp_ms
             write_record(
                 {
                     "schema_version": "rodai.session.v1",
@@ -117,12 +134,12 @@ def process_video(
                 }
             )
             frame_id += 1
-            progress(frame_id)
+            progress(analyzed_frames)
 
-        if frame_id == 0 and not stopped:
+        if analyzed_frames == 0 and not stopped:
             raise InvalidVideoError("The uploaded video contains no decodable frames.")
         metadata = VideoMetadata(width, height, raw_fps, reported_count, duration_ms)
-        return metadata, frame_id, stopped
+        return metadata, analyzed_frames, stopped
     finally:
         capture.release()
 
@@ -134,6 +151,7 @@ def write_jsonl_session(
     *,
     session_id: str,
     max_video_seconds: int | None = None,
+    analysis_fps: float | None = None,
     should_continue: Callable[[], bool] | None = None,
     detect_frame: Callable[[Any], list[dict[str, Any]]] | None = None,
 ) -> tuple[VideoMetadata, int, bool]:
@@ -151,6 +169,7 @@ def write_jsonl_session(
             progress,
             session_id=session_id,
             max_video_seconds=max_video_seconds,
+            analysis_fps=analysis_fps,
             should_continue=should_continue,
             detect_frame=detect_frame,
         )
@@ -160,7 +179,8 @@ def write_jsonl_session(
             "session_id": session_id,
             "processed_frames": processed_frames,
             "video": asdict(metadata),
-            "inference": "complete" if detect_frame else "not-run",
+            "analysis_fps": analysis_fps if detect_frame else None,
+            "inference": "complete" if detect_frame and processed_frames > 0 else "not-run",
             "status": "stopped" if stopped else "completed",
         }
         write_record(summary)

@@ -62,6 +62,7 @@ class SessionState:
     metadata: dict[str, Any] | None = None
     error: str | None = None
     camera_settings: dict[str, int | float] | None = None
+    analysis_fps: float | None = None
 
     def response(self) -> dict[str, Any]:
         return asdict(self) | {"result_url": f"/api/v1/sessions/{self.id}/results"}
@@ -172,6 +173,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
         request: Request,
         background_tasks: BackgroundTasks,
         filename: str,
+        analysis_fps: float | None = Query(default=None, ge=1.0, le=15.0),
     ) -> dict[str, Any]:
         suffix = Path(filename).suffix.lower()
         if suffix not in VIDEO_SUFFIXES:
@@ -193,6 +195,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                     status="uploading",
                     created_at=datetime.now(UTC).isoformat(),
                     uploaded_bytes=0,
+                    analysis_fps=analysis_fps or settings.analysis_fps,
                 ),
                 settings.max_concurrent_sessions,
             )
@@ -259,6 +262,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             state_id,
             retained_upload_path,
             sessions_dir / state_id / "results.jsonl",
+            analysis_fps=state.analysis_fps or settings.analysis_fps,
         )
         state = registry.get(state_id)
         assert state is not None
@@ -747,6 +751,7 @@ def _persisted_session(
         "created_at": created_at.isoformat() if isinstance(created_at, datetime) else created_at,
         "uploaded_bytes": 0,
         "processed_frames": 0,
+        "analysis_fps": None,
         "dropped_frames": 0,
         "metadata": None,
         "error": None,
@@ -763,6 +768,7 @@ def _persisted_session(
             summary_line = tail.splitlines()[-1]
             summary = json.loads(summary_line)
             result["processed_frames"] = summary.get("processed_frames", 0)
+            result["analysis_fps"] = summary.get("analysis_fps")
             result["dropped_frames"] = summary.get("dropped_frames", 0)
             result["metadata"] = summary.get("video") or {
                 "width": summary.get("width", 0),
@@ -899,6 +905,8 @@ def _process_video(
     session_id: str,
     upload_path: Path,
     result_path: Path,
+    *,
+    analysis_fps: float,
 ) -> None:
     try:
         registry.update(session_id, status="processing")
@@ -914,6 +922,7 @@ def _process_video(
             lambda value: registry.update(session_id, processed_frames=value),
             session_id=session_id,
             max_video_seconds=settings.max_video_seconds,
+            analysis_fps=analysis_fps,
             should_continue=control.should_continue if control else None,
             detect_frame=get_detector(settings),
         )

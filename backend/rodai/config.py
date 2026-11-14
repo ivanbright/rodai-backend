@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     detection_model_revision: str = "70120ba84d68ca1211e007c4fb61d0cd5424be54"
     detection_threshold: float = Field(0.35, ge=0.05, le=0.99)
     inference_imgsz: int = Field(640, ge=128, le=2048)
+    analysis_fps: float = Field(2.0, ge=1.0, le=15.0)
     log_level: str = "INFO"
 
     @field_validator("allowed_origins", mode="before")
