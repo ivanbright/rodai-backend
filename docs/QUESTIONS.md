@@ -1,28 +1,18 @@
-# Questions for the Owner — Phase 0 (updated for Docker/Railway addendum)
+# Questions for the Owner — Phase 0 closeout
 
-Please answer in one consolidated reply. Items marked **blocks a concrete design or later phase** need a decision before that work starts.
+The consolidated owner response answers the former questions on target geography, camera sources, privacy defaults, commercial licensing preference, Python version, database, export priorities, frame transport, concurrency, UI direction, Railway topology, user access, upload limits, and hosted camera scope. See `DECISIONS.md` for the recorded requirements.
 
-1. **Deployment context (blocks target design/evaluation):** Where will RodAI first be demonstrated or used? Is Kigali/Rwanda road footage the target? Which data-protection rules apply to that footage?
-2. **Camera and footage (blocks motion/risk design and sample-video acceptance):** Is the intended source fixed roadside/CCTV, dashcam, drone, phone, or another camera? Do you have sample videos? For each, provide source, licence/permission, duration, resolution/FPS, recording context, and any restrictions. May samples be copied into `datasets/raw/samples/`?
-3. **Privacy (blocks upload/export behavior):** Should uploaded footage be deleted after processing? How long should session results persist? May exports contain frames or annotated video? Is face/plate blurring required?
-4. **Licensing (blocks detector/weights selection):** Is RodAI strictly research/open-source under compatible terms, or might it be distributed commercially/proprietarily? Is AGPL-3.0 acceptable, or should we restrict candidates to permissively licensed code and separately reviewed weights?
-5. **Hardware (blocks workload/performance and install plan):** Please provide Windows edition, CPU, RAM, GPU and VRAM, CUDA/driver availability, and free disk space. `systeminfo` and CIM queries were denied in this environment; `nvidia-smi` is unavailable.
-6. **Python compatibility:** Can we use a Python 3.12 project environment alongside installed Python 3.13.2? Current PyTorch Windows instructions list Python 3.9–3.12.
-7. **Session persistence and export:** Are file-based JSONL results sufficient, or is SQLite/searchable history across restarts required? Should annotated video export be included in v0.1?
-8. **Transport proposal:** Approve binary WebSocket JPEG frames with client capture timestamps and frame IDs, and ordered processing for uploaded videos versus bounded newest-frame-wins live preview with counted drops? Any capture-resolution/quality cap requirement?
-9. **Concurrency:** Is one simultaneous session acceptable for v0.1? What should happen when another session is started?
-10. **Design references:** Please supply screenshots or a design reference before Phase 5. None are present in the repository.
-11. **Phase 0 gate:** After reviewing this report and the decisions above, do you approve Phase 0? The required gate phrase is `APPROVED: Phase 0`.
+## Remaining confirmations / facts
 
-## Addendum decisions required
+1. **Phase 0 gate:** Review the completed report in `docs/handovers/phase-0.md`. Phase 0 remains pending until the owner sends the exact phrase `APPROVED: Phase 0`. The pasted decisions explicitly say they are not approval.
+2. **Sample footage and permissions:** Provide or identify one or more legally usable sample videos representative of Kigali/Rwanda conditions. Include source, permission/licence, recording context, length, resolution/FPS, restrictions, and whether people/plates are identifiable. Do not download or copy unreviewed footage into the repository.
+3. **Hardware:** The workspace confirms Python 3.13.2 on host and CPU-only PyTorch in Docker, but not host GPU status. From non-admin PowerShell, try `Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsBuildNumber, CsProcessors, CsTotalPhysicalMemory` and `Get-PSDrive -Name C | Select-Object Used, Free`. For graphics details, run `dxdiag /t "$env:TEMP\rodai-dxdiag.txt"` and share the System and Display sections from that report. If a command is blocked, use Windows Settings > System > About and Task Manager > Performance > GPU; do not install GPU tooling or change drivers yet.
+4. **Railway spending:** Select a Railway plan and explicit monthly spend ceiling before paid provisioning or deployment. Domain planning uses `rodai.cursorclick.dev`; do not configure DNS or purchase anything without separate approval.
+5. **Privacy/legal implementation:** Confirm with qualified counsel or the relevant authority how Rwanda's personal-data law applies to the intended collection, processing, storage and sharing. The 7/30/7-day defaults are recorded but not implemented; confirm whether these defaults are acceptable for the first deployment.
+6. **Phase 2 conformance:** The owner requirements for automatic retention and configurable camera capture controls must be reflected in an implementation/acceptance plan before Phase 3. Current code does not yet implement the retention windows or configurable 1280x720/JPEG quality controls. One-session enforcement is implemented through the session registry.
 
-12. **Railway domain:** What domain/subdomain and DNS provider should be used? Do not share credentials; those belong in Railway's secret settings.
-13. **Railway budget/plan:** Which Railway plan and monthly spend ceiling should the design target? Current plan resource ceilings vary substantially; set workspace usage limits as part of deployment.
-14. **Users:** Is deployed access for only you, invited testers, or the public? This sets account creation, rate limits and upload quotas.
-15. **Frontend topology:** Accept one Railway app service serving backend and built frontend from the same origin, or do you require a separate frontend service/CDN?
-16. **Local database:** Accept PostgreSQL in Docker Compose to match production, or choose SQLite locally and accept database behavior drift?
-17. **Uploads:** What maximum upload size and duration should be configured? What retention period applies to uploads, exports and model files?
-18. **Public camera:** Must browser-camera processing be supported on the public deployment, or is uploaded-video processing sufficient for first release? Public live video consumes user bandwidth and service CPU.
-19. **Authentication:** Unless you direct otherwise, the proposed first design is owner-managed/invite-only accounts with password hashes and secure session cookies; confirm audience and whether account self-registration is prohibited.
+## Not blockers to architecture, but required before later work
 
-Existing questions 1–10 remain open, especially camera/footage, data permissions, privacy regime, detector license, hardware facts, Python 3.12, and sample videos.
+- Detector source and weight licence review, class-map confirmation and commercial compatibility (before selecting/downloading weights).
+- Design references/screenshots (before Phase 5 visual redesign).
+- Performance targets after real Phase 3 benchmarks on representative footage and hardware.

@@ -21,3 +21,9 @@
 - Backend pytest (4 passed), Ruff, frontend production build, ESLint and Vitest (1 passed) pass. Host pytest ran on Python 3.13.2; Docker API image uses Python 3.12.8.
 - `npm ci` reported 14 dependency vulnerabilities; advisory lookup via `npm audit` failed TLS certificate verification and remains unresolved.
 - Video input, sessions, detector inference and model weights remain unimplemented.
+
+## Unreleased — Phase 0 owner decisions reconciled (2026-11-14)
+
+- Recorded the owner's Rwanda/Kigali target, privacy/retention defaults, commercial licensing constraint, isolated Python 3.12 environment, PostgreSQL requirement, transport/concurrency settings, Railway topology, invite-only access, planned domain, and deployment spending gate.
+- Updated Phase 0 architecture and remaining questions. The owner explicitly withheld Phase 0 approval; no new implementation phase is authorized.
+- Flagged current conformance gaps: automated retention and configurable 1280x720/JPEG capture controls are not implemented.

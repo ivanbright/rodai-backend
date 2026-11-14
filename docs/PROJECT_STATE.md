@@ -2,12 +2,12 @@
 
 Updated: 2026-11-14
 
-- **Current phase:** Phase 2 — video/session pipeline. Upload decoding, browser camera frame transport, session controls and frame-aligned JSONL exports are implemented. Phase 2 local checks passed; model inference remains a later phase.
-- **Authorization:** The owner gave broad consent to begin and directed continued development. Earlier state documents did not record named phase approvals; retain the master prompt’s gates for material decisions.
+- **Current gate:** Phase 0 architecture review. The owner supplied consolidated decisions but explicitly withheld Phase 0 approval pending the completed report. Wait for `APPROVED: Phase 0` before new implementation work.
+- **Implementation already present:** Phase 1 foundation and Phase 2 video/session code were built and pushed before the latest consolidated decisions arrived. Preserve that history. Do not infer approval for Phase 3 or later.
 - **Verified today:** PostgreSQL, API and Vite containers are running; API is healthy and the frontend serves HTTP 200; its `/api/v1/health` proxy returns healthy with database available. Alembic `0001_initial` is applied. Backend tests (9 passed), Ruff, frontend build, ESLint and Vitest (2 passed) pass. Synthetic video upload/result/deletion and browser camera websocket flows are covered by tests; upload smoke test ran against Docker.
 - **Runtime:** Docker API uses Python 3.12.8 and PyTorch 2.14.1+cpu; CUDA is unavailable in that runtime, so CPU is selected. Host tests ran under Python 3.13.2, outside the package’s declared `>=3.12,<3.13` range.
 - **Known issue:** `npm ci` reported 14 dependency vulnerabilities (2 low, 9 moderate, 1 high, 2 critical). `npm audit` could not retrieve advisory details because TLS certificate verification to `registry.npmjs.org` failed; investigate before deployment.
-- **Next step:** Phase 3 detector integration requires choosing a model/package with reviewed license, sample footage and permissions, and confirming target camera context and available hardware. These remain unresolved; do not download weights or claim detector performance before then.
+- **Next step:** Phase 0 report and open questions are reconciled with the owner's decisions. Await `APPROVED: Phase 0`; after that gate, address the documented Phase 2 retention and configurable-camera gaps before detector planning.
 
 ## Verified environment and project facts
 
@@ -23,8 +23,8 @@ Updated: 2026-11-14
 
 ## Not verified / outstanding
 
-- Exact Windows edition, CPU model, installed RAM, GPU/VRAM and driver/CUDA on the host; target camera geometry; sample footage; local inference performance.
+- Exact Windows edition, CPU model, installed RAM, GPU/VRAM and driver/CUDA on the host; target camera geometry; permissioned sample footage; local inference performance.
 - Frontend dependency advisories (audit endpoint certificate failure).
 - Detector package/weights choice and licenses; no model weights are installed.
 - Phase 3 inference, tracking and model weights have not been implemented.
-- Deployment-specific Railway plan, domain, audience, retention, privacy and public authentication decisions remain open.
+- Railway spending ceiling and deployment authorization remain open. Planned hostname is rodai.cursorclick.dev; DNS is not configured. Retention and authentication requirements are decided but not yet implemented.

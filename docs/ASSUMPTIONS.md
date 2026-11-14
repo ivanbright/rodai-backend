@@ -1,9 +1,22 @@
-# RodAI Assumptions
+# RodAI Assumptions and constraints
 
-No unconfirmed assumption is being used to build application behavior. These reversible planning defaults are awaiting owner confirmation:
+Updated 2026-11-14. Owner-provided decisions in `DECISIONS.md` replace earlier provisional assumptions.
 
-- **A0-1:** A local-only, single-user demonstration is the initial deployment target. This is a working proposal, not verified deployment context.
-- **A0-2:** One active processing session is a reasonable v0.1 starting limit pending hardware review.
-- **A0-3:** JSONL files are sufficient for v0.1 session exports unless cross-restart searchable event history is required.
-- **A0-4:** In the absence of supplied design references, Phase 2–4 can use only the plain functional Dev Viewer required by the prompt; polished design must wait for references and an approved design spec.
-- **A0-5:** Proposed acceptance thresholds will be workload-specific and set after Phase 3 benchmarking rather than asserting an FPS before hardware and footage are known.
+## Confirmed requirements
+
+- Initial target is selected-user research/demonstration in Rwanda, including Kigali traffic, without hardcoding the system to that location.
+- CPU inference is mandatory; GPU acceleration is optional after the hardware is identified.
+- PostgreSQL is the primary persistent store, and the existing Compose PostgreSQL configuration must be preserved.
+- One processing session, 500 MB uploads, 600-second duration, binary WebSocket JPEG camera frames with frame IDs/timestamps, ordered upload processing, bounded live processing with drop counts.
+- Commercial compatibility is desired; no AGPL-3.0 without explicit approval; code, weights and datasets each require a licence review.
+- Privacy/retention defaults, invite-only hosted access, same-origin Railway topology and the planned domain are recorded in `DECISIONS.md`.
+
+## Unknown facts and implementation gaps (not assumptions)
+
+- Host GPU/VRAM/CUDA, exact Windows and CPU details remain unverified; current Docker PyTorch is CPU-only.
+- No permissioned Rwanda/Kigali sample footage has been supplied. Do not fetch or store unreviewed footage.
+- Retention timers for 7-day uploads/exports and 30-day results are not implemented. Current upload originals are temporary during processing and removed afterward; result/session artifacts remain until explicitly deleted.
+- Camera resolution cap/configuration and JPEG quality configuration are not implemented; current frontend captures at source resolution with fixed JPEG quality 0.82.
+- Detector, tracking, movement analysis and risk analysis are not implemented.
+- Railway budget is unset, and no Railway deployment or paid service is authorized. `rodai.cursorclick.dev` is planning information only; no DNS changes are authorized.
+- Phase 0 approval has not been given. Do not start another implementation phase until the owner reviews the report and sends `APPROVED: Phase 0`.

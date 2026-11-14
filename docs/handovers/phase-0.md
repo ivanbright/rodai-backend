@@ -143,7 +143,37 @@ Owner answers the questions and reviews proposals, then sends `APPROVED: Phase 0
 - Railway [networking limits](https://docs.railway.com/networking/public-networking/specs-and-limits) document WebSockets over HTTP/1.1 and that WebSocket connections are exempt from normal request-duration/inactivity limits. HTTP request bodies still have a five-minute upload completion limit; long video uploads therefore need bounded sizes and/or chunked transfer.
 - Railway [service storage docs](https://docs.railway.com/services) explain that deployment filesystem outside a mounted volume is ephemeral. Persistent video, exports, and downloaded weights must stay on the volume.
 
-## Addendum impact and revised implementation plan
+## Consolidated owner decisions and architecture reconciliation — 2026-11-14
+
+The owner supplied a consolidated Phase 0 decision document. These decisions are recorded in `docs/DECISIONS.md`; they are requirements for planning and **do not approve Phase 0**. The owner explicitly said to complete the report and wait for `APPROVED: Phase 0` before starting Phase 1. Phase 1 and Phase 2 code were already implemented/pushed before this latest instruction; this is historical context, not a reason to infer approval for any next phase.
+
+### Confirmed target and architecture
+
+- Selected-user research and demonstration, initially targeting Rwanda/Kigali; do not hardcode geography. Support fixed roadside/CCTV, dashcam, uploads and browser camera, with extensible source adapters.
+- Local-first inference, Docker/Compose packaging, PostgreSQL as primary application store, Railway target for an eventual controlled hosted service, same-origin app serving built frontend and API, persistent Railway volume, CPU-only hosted inference.
+- Invite-only owner-managed hosted accounts, no self-registration, secure password hashing/cookies. Public live camera is out of the first hosted release; local camera remains in scope.
+- Initial upload limits: 500 MB, 600 seconds, one concurrent processing session. PostgreSQL stores searchable application/session metadata; portable JSONL exports do not replace it.
+- Offline video frames are ordered. Browser camera uses binary JPEG over `rodai.v1`, frame IDs and capture timestamps, bounded newest-frame-wins, counted drops, configurable size/quality, proposed capture ceiling 1280x720.
+- V0.1 prioritizes actual detection, tracking and visualization; annotated video is optional and accident prediction is not part of the promised first demo.
+
+### Privacy, licensing and operations
+
+- Privacy defaults: private by default, uploaded video up to 7 days, session metadata/results 30 days, exports 7 days, configurable deletion; no source frames in exports by default. Face/plate blur is needed before external sharing, and anonymization cannot be claimed without checking the result. Rwanda personal-data requirements need qualified interpretation for the selected use.
+- Commercial compatibility is required. Prefer permissive software; do not use AGPL-3.0 without explicit approval. Review source, model weights and data separately. No detector or weight is selected.
+- Use isolated Python 3.12 and leave host Python 3.13.2 untouched. Require CPU fallback; optional GPU waits on hardware inspection.
+- Planned hostname is `rodai.cursorclick.dev`; the Railway-provided domain is fallback. Do not configure DNS or purchase anything without approval. Railway plan/spend limit is not decided; no paid provisioning or deployment is authorized.
+
+### Current mismatch and phase boundary
+
+The current source implements one-session limits and the existing 500 MB/600-second settings. It currently deletes original uploads after processing and leaves results until the user deletes the session; automated 7-day/30-day/7-day retention is not implemented. Browser capture currently uses source resolution and fixed JPEG quality 0.82, with no 1280x720 cap or configurable quality. These are explicit implementation gaps to resolve in an approved plan. Authentication, public deployment, detector, tracking and risk analysis are also absent.
+
+Current Compose names are preserved: service/container `rodai-db`; configured database name `rodai`; user `rodai`. Do not rename or alter connection settings based on the textual shorthand in the owner questionnaire.
+
+### Phase 0 exit status
+
+Architecture and owner decisions are documented; remaining questions are listed in `docs/QUESTIONS.md`. Hardware, representative permissioned samples, privacy-law application and Railway spend limit remain open facts/decisions. Phase 0 is **not approved and not marked complete**. Stop here and wait for the owner to review and send `APPROVED: Phase 0`.
+
+## Addendum impact and revised implementation plan (original note)
 
 The addendum supersedes conflicting master-prompt rules. The approved target is now local-first inference with Docker packaging, Railway deployment, PostgreSQL persistence, CPU-only production inference, environment-variable configuration, and authentication for public access. Phase 1 now needs Dockerfiles, Compose, `.env.example`, Pydantic Settings, PostgreSQL/Alembic, and container tests. Phase 1B is a distinct Railway deployment gate. Every later phase must include Docker/Compose acceptance; deployment checks and Railway CPU measurements are added at the specified gates.
 
