@@ -3,12 +3,9 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from rodai.config import get_settings
 from rodai.database import create_database_engine
@@ -90,17 +87,3 @@ def health() -> dict[str, object]:
 @app.get("/api/v1/system", tags=["system"])
 def system_status() -> dict[str, object]:
     return build_health(settings, engine)
-
-
-frontend_dist = Path(__file__).resolve().parents[1] / "frontend" / "dist"
-if frontend_dist.is_dir():
-    app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
-
-    @app.get("/{path:path}", include_in_schema=False)
-    def frontend(path: str) -> FileResponse:
-        requested = (frontend_dist / path).resolve()
-        if frontend_dist.resolve() not in requested.parents:
-            requested = frontend_dist / "index.html"
-        if not requested.is_file():
-            requested = frontend_dist / "index.html"
-        return FileResponse(requested)

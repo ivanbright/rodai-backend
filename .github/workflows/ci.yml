@@ -19,10 +19,9 @@ jobs:
     name: Backend lint and tests
     runs-on: ubuntu-latest
     steps:
-      - name: Check out with frontend submodule
+      - name: Check out source
         uses: actions/checkout@v7
         with:
-          submodules: recursive
           persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -42,10 +41,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: backend
     steps:
-      - name: Check out with frontend submodule
+      - name: Check out source
         uses: actions/checkout@v7
         with:
-          submodules: recursive
           persist-credentials: false
       - name: Build container
         run: docker build --pull --tag rodai:ci --file backend/Dockerfile .

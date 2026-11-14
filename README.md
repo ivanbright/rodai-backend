@@ -27,7 +27,7 @@ Open `http://localhost:5173` to process a local MP4, MOV, MKV, WebM or AVI. The 
 
 The first video-analysis inference downloads and caches pinned model weights into the persistent `rodai_data` volume. Synthetic lab scenarios do not require an internet download or model weights.
 
-Local Compose uses PostgreSQL. The frontend proxies `/api` to FastAPI; the production API image also serves the built frontend.
+Local Compose uses PostgreSQL and the Vite development proxy. In Railway, deploy the frontend and API as separate services; set the frontend's `VITE_API_BASE_URL` to the public API origin and allow the frontend origin in `RODAI_ALLOWED_ORIGINS`.
 
 ## Quality checks
 
