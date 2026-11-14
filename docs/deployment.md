@@ -8,12 +8,16 @@ One Dockerfile-based `rodai-app` service serves the built frontend and FastAPI f
 
 ## Variables
 
-Configure the variables listed in `.env.example` in Railway service settings. Set `PORT` from Railway, `DATABASE_URL` using the Railway PostgreSQL private connection URL, unique `RODAI_SECRET_KEY`, HTTPS origin allow-list, production data/model paths, upload/duration/concurrency limits, CPU device, model ID and log level. Never store credentials in Git or images.
+Railway scans root-level `.env` and `.env.<suffix>` files in the connected repository and offers their values as suggestions in the service Variables tab. Use the root-level `.env.railway.example` for the RodAI service; `.env.example` contains local-development values and must not be imported into production. Railway only suggests these values: import them in the app service's Variables tab and review the staged changes.
+
+The template references the PostgreSQL service by the name `Postgres`. Keep that service name or update the `${{Postgres.*}}` references to match the actual Railway database service name. `DATABASE_URL` includes the SQLAlchemy `+psycopg` driver required by this backend. Replace `RODAI_SECRET_KEY` with a newly generated secret before deploying; the committed local-only value intentionally fails production validation. Do not set `PORT`; Railway provides it. Never commit real credentials or secrets.
+
+The repository uses `frontend` as a Git submodule and the Dockerfile needs the repository root as its build context. Set the service Dockerfile path to `backend/Dockerfile`, leave the root directory at `/`, and confirm Railway checks out the submodule. The template includes Railway's recursive clone setting for this submodule.
 
 ## Ordered deployment steps (not yet executed)
 
 1. Wait for the owner to approve a Railway plan and explicit monthly spend ceiling; set usage alerts/hard limits before provisioning paid resources.
-2. Create the PostgreSQL service and app service from the repository using the Dockerfile.
+2. Create the PostgreSQL service and app service from the repository's `main` branch using the Dockerfile. Enable Railway's wait-for-CI deployment gate.
 3. Attach the app volume at `/var/lib/rodai`; confirm the service user can write it.
 4. Configure environment variables and database connectivity. Run Alembic migration as an explicit release step with documented rollback.
 5. Set `/api/v1/health` as the health check, verify database/device/model/volume status, and test app + WebSocket behavior.

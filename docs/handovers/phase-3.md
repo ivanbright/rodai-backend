@@ -39,9 +39,9 @@ Then open `http://localhost:5173`, choose an MP4, MOV, MKV, WebM or AVI video, p
 - The Pexels video is a private local pipeline smoke test, not representative Kigali footage. Source frames include pedestrians and small visible plates; do not share the footage or outputs externally without privacy review and plate blurring. Owner-provided footage with documented rights and required metadata remains a prerequisite for representative acceptance.
 - Hardware details are not yet confirmed. Measure throughput, per-frame latency, CPU/RAM and drop rate on the development hardware using representative permissioned footage before setting performance targets or permitting higher capture resolutions.
 - The React overlay path is implemented and result retrieval was observed in API logs, but the UI could not be screenshot-verified in this session because the computer/browser-control service was unavailable. Recheck the visible overlay during the next interactive review.
-- Face/plate blurring, tracking, event detection, model evaluation on a labeled target sample, deployment, authentication and product design from the owner?s references remain future work. Phase 5 design references must be reviewed before design implementation.
+- Tracking is now present as a prototype; identity validation remains future work. Face/plate blurring, event detection, model evaluation on a labeled target sample, deployment, authentication and the owner?s dashboard design references remain future work.
 - Model licensing notes are technical provenance, not a legal determination. See [MODEL_PROVENANCE.md](../MODEL_PROVENANCE.md).
 
-## Next step: simulation lab
+## Product direction after the owner visual references
 
-The first controlled-scenario lab is recorded in `phase-4.md`. It demonstrates scripted conflict scenarios and a rule-based intervention flow independently of camera detection. The lab is not accident-prediction model evidence.
+The owner's 2026-11-14 visual references establish real road-camera video analysis as the product direction. The scripted SVG demonstration in `phase-4.md` does not meet that requirement. Prototype tracking is documented in [Phase 5](phase-5.md); calibrated movement measurement, CCTV ingestion, conflict/incident evaluation, and an operator dashboard remain future milestones. See [PRODUCT_VISION.md](../PRODUCT_VISION.md) for acceptance criteria. Representative permissioned footage and hardware benchmarks remain necessary before performance or target-region claims.

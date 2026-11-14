@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import math
+import mimetypes
 import shutil
 import threading
 import time
@@ -35,6 +36,7 @@ from sqlalchemy import Engine, text
 from rodai.config import Settings
 from rodai.detector import get_detector
 from rodai.retention import register_artifact
+from rodai.tracking import RoadObjectTracker
 from rodai.video_pipeline import InvalidVideoError, write_jsonl_session
 
 logger = logging.getLogger("rodai.sessions")
@@ -61,6 +63,7 @@ class SessionState:
     metadata: dict[str, Any] | None = None
     error: str | None = None
     camera_settings: dict[str, int | float] | None = None
+    analysis_fps: float | None = None
 
     def response(self) -> dict[str, Any]:
         return asdict(self) | {"result_url": f"/api/v1/sessions/{self.id}/results"}
@@ -171,6 +174,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
         request: Request,
         background_tasks: BackgroundTasks,
         filename: str,
+        analysis_fps: float | None = Query(default=None, ge=1.0, le=15.0),
     ) -> dict[str, Any]:
         suffix = Path(filename).suffix.lower()
         if suffix not in VIDEO_SUFFIXES:
@@ -192,6 +196,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                     status="uploading",
                     created_at=datetime.now(UTC).isoformat(),
                     uploaded_bytes=0,
+                    analysis_fps=analysis_fps or settings.analysis_fps,
                 ),
                 settings.max_concurrent_sessions,
             )
@@ -258,6 +263,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             state_id,
             retained_upload_path,
             sessions_dir / state_id / "results.jsonl",
+            analysis_fps=analysis_fps or settings.analysis_fps,
         )
         state = registry.get(state_id)
         assert state is not None
@@ -330,6 +336,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
         result_path.parent.mkdir(parents=True, exist_ok=True)
         output = result_path.open("w", encoding="utf-8", newline="\n")
         start_time = time.monotonic()
+        tracker = RoadObjectTracker()
         processed_frames = 0
         dropped_frames = 0
         last_frame_id = -1
@@ -438,6 +445,11 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                 detections: list[dict[str, Any]] = []
                 if detector:
                     detections = await asyncio.to_thread(detector, frame)
+                tracks = (
+                    tracker.update(detections, timestamp_ms=capture_time, frame_id=frame_id)
+                    if detector
+                    else []
+                )
                 frame_record = {
                     "schema_version": "rodai.session.v1",
                     "type": "frame",
@@ -451,7 +463,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                     "capture_settings": camera_settings,
                     "dropped_since_last": dropped,
                     "detections": detections,
-                    "tracks": [],
+                    "tracks": tracks,
                     "inference": "complete" if detector else "not-run",
                 }
                 output.write(json.dumps(frame_record, separators=(",", ":")) + "\n")
@@ -484,6 +496,7 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
                         "height": height,
                         "duration_ms": elapsed_ms,
                         "detections": detections,
+                        "tracks": tracks,
                         "inference": "complete" if detector else "not-run",
                     }
                 )
@@ -591,6 +604,32 @@ def make_sessions_router(settings: Settings, engine: Engine) -> APIRouter:
             row["created_at"],
             row["source_type"] or "video",
             row["camera_config"],
+        )
+
+    @router.get("/{session_id}/video")
+    def get_session_video(session_id: str) -> FileResponse:
+        parsed_id = _parse_id(session_id)
+        with engine.connect() as connection:
+            source_type = connection.execute(
+                text(
+                    "SELECT src.source_type FROM sessions AS s "
+                    "LEFT JOIN sources AS src ON src.id = s.source_id WHERE s.id = :id"
+                ),
+                {"id": parsed_id},
+            ).scalar_one_or_none()
+        if source_type is None:
+            raise HTTPException(404, "Session not found.")
+        if source_type != "video":
+            raise HTTPException(404, "This session has no uploaded video.")
+        video_paths = list(uploads_dir.glob(f"{parsed_id}.*"))
+        if not video_paths or not video_paths[0].is_file():
+            raise HTTPException(404, "The uploaded video has expired or is unavailable.")
+        video_path = video_paths[0]
+        media_type = mimetypes.guess_type(video_path.name)[0] or "application/octet-stream"
+        return FileResponse(
+            video_path,
+            media_type=media_type,
+            content_disposition_type="inline",
         )
 
     @router.post("/{session_id}/pause")
@@ -739,6 +778,7 @@ def _persisted_session(
         "created_at": created_at.isoformat() if isinstance(created_at, datetime) else created_at,
         "uploaded_bytes": 0,
         "processed_frames": 0,
+        "analysis_fps": None,
         "dropped_frames": 0,
         "metadata": None,
         "error": None,
@@ -755,6 +795,7 @@ def _persisted_session(
             summary_line = tail.splitlines()[-1]
             summary = json.loads(summary_line)
             result["processed_frames"] = summary.get("processed_frames", 0)
+            result["analysis_fps"] = summary.get("analysis_fps")
             result["dropped_frames"] = summary.get("dropped_frames", 0)
             result["metadata"] = summary.get("video") or {
                 "width": summary.get("width", 0),
@@ -891,6 +932,8 @@ def _process_video(
     session_id: str,
     upload_path: Path,
     result_path: Path,
+    *,
+    analysis_fps: float,
 ) -> None:
     try:
         registry.update(session_id, status="processing")
@@ -906,6 +949,7 @@ def _process_video(
             lambda value: registry.update(session_id, processed_frames=value),
             session_id=session_id,
             max_video_seconds=settings.max_video_seconds,
+            analysis_fps=analysis_fps,
             should_continue=control.should_continue if control else None,
             detect_frame=get_detector(settings),
         )
