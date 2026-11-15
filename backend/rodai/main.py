@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from rodai.benchmark_library import make_benchmark_router
 from rodai.config import get_settings
 from rodai.database import create_database_engine
 from rodai.health import build_health
@@ -90,6 +91,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
 app.include_router(make_sessions_router(settings, engine, session_registry))
+app.include_router(make_benchmark_router(settings, engine, session_registry))
 
 
 @app.get("/api/v1/health", tags=["health"])

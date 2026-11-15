@@ -61,6 +61,7 @@ class SessionState:
     processed_frames: int = 0
     dropped_frames: int = 0
     metadata: dict[str, Any] | None = None
+    benchmark: dict[str, Any] | None = None
     error: str | None = None
     camera_settings: dict[str, int | float] | None = None
     analysis_fps: float | None = None
@@ -150,7 +151,7 @@ def make_sessions_router(
             rows = connection.execute(
                 text(
                     "SELECT s.id, s.status, s.created_at, s.camera_config, s.error, "
-                    "src.source_type "
+                    "src.source_type, src.source_metadata "
                     "FROM sessions AS s LEFT JOIN sources AS src ON src.id = s.source_id "
                     "ORDER BY s.created_at DESC LIMIT :limit"
                 ),
@@ -172,6 +173,7 @@ def make_sessions_router(
                         row["source_type"] or "video",
                         row["camera_config"],
                         row["error"],
+                        row["source_metadata"],
                     )
                 )
         return items
@@ -605,7 +607,7 @@ def make_sessions_router(
                 connection.execute(
                     text(
                         "SELECT s.id, s.status, s.created_at, s.camera_config, s.error, "
-                        "src.source_type "
+                        "src.source_type, src.source_metadata "
                         "FROM sessions AS s LEFT JOIN sources AS src ON src.id = s.source_id "
                         "WHERE s.id = :id"
                     ),
@@ -624,21 +626,40 @@ def make_sessions_router(
             row["source_type"] or "video",
             row["camera_config"],
             row["error"],
+            row["source_metadata"],
         )
 
     @router.get("/{session_id}/video")
     def get_session_video(session_id: str) -> FileResponse:
         parsed_id = _parse_id(session_id)
         with engine.connect() as connection:
-            source_type = connection.execute(
+            source_row = connection.execute(
                 text(
-                    "SELECT src.source_type FROM sessions AS s "
+                    "SELECT src.source_type, src.source_metadata FROM sessions AS s "
                     "LEFT JOIN sources AS src ON src.id = s.source_id WHERE s.id = :id"
                 ),
                 {"id": parsed_id},
-            ).scalar_one_or_none()
-        if source_type is None:
+            ).first()
+        if source_row is None:
             raise HTTPException(404, "Session not found.")
+        source_type, source_details = source_row
+        if source_type == "benchmark_video":
+            if not settings.dataset_library_enabled:
+                raise HTTPException(404, "The local benchmark library is disabled.")
+            benchmark = _decode_source_metadata(source_details)
+            relative_file = benchmark.get("relative_file")
+            if not isinstance(relative_file, str):
+                raise HTTPException(404, "The benchmark source reference is unavailable.")
+            dataset_root = settings.dataset_dir.resolve()
+            video_path = (dataset_root / relative_file).resolve()
+            if dataset_root not in video_path.parents or not video_path.is_file():
+                raise HTTPException(404, "The local benchmark video is unavailable.")
+            media_type = mimetypes.guess_type(video_path.name)[0] or "application/octet-stream"
+            return FileResponse(
+                video_path,
+                media_type=media_type,
+                content_disposition_type="inline",
+            )
         if source_type != "video":
             raise HTTPException(404, "This session has no uploaded video.")
         video_paths = list(uploads_dir.glob(f"{parsed_id}.*"))
@@ -790,10 +811,18 @@ def _persisted_session(
     source_type: str = "video",
     camera_config: str | dict[str, Any] | None = None,
     error: str | None = None,
+    source_details: str | dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    benchmark = _decode_source_metadata(source_details)
     result: dict[str, Any] = {
         "id": session_id,
-        "filename": "Browser camera" if source_type == "browser_camera" else "Uploaded video",
+        "filename": (
+            "Browser camera"
+            if source_type == "browser_camera"
+            else str(benchmark.get("title", "Benchmark video"))
+            if source_type == "benchmark_video"
+            else "Uploaded video"
+        ),
         "source_type": source_type,
         "status": session_status,
         "created_at": created_at.isoformat() if isinstance(created_at, datetime) else created_at,
@@ -805,6 +834,10 @@ def _persisted_session(
         "error": error,
         "result_url": f"/api/v1/sessions/{session_id}/results",
     }
+    if source_type == "benchmark_video" and benchmark:
+        result["benchmark"] = {
+            key: value for key, value in benchmark.items() if key != "relative_file"
+        }
     if camera_config:
         result["camera_settings"] = (
             json.loads(camera_config) if isinstance(camera_config, str) else camera_config
@@ -835,6 +868,7 @@ def _create_database_session(
     session_id: str,
     *,
     source_type: str = "video",
+    source_metadata: dict[str, Any] | None = None,
     camera_config: dict[str, Any] | None = None,
     analysis_fps: float | None = None,
 ) -> None:
@@ -843,10 +877,15 @@ def _create_database_session(
     with engine.begin() as connection:
         connection.execute(
             text(
-                "INSERT INTO sources (id, source_type, created_at) "
-                "VALUES (:id, :source_type, :created_at)"
+                "INSERT INTO sources (id, source_type, source_metadata, created_at) "
+                "VALUES (:id, :source_type, :source_metadata, :created_at)"
             ),
-            {"id": source_id, "source_type": source_type, "created_at": now},
+            {
+                "id": source_id,
+                "source_type": source_type,
+                "source_metadata": json.dumps(source_metadata) if source_metadata else None,
+                "created_at": now,
+            },
         )
         connection.execute(
             text(
@@ -898,6 +937,18 @@ def _delete_session_records(engine: Engine, session_id: str) -> None:
         logger.exception("Could not roll back failed session records session_id=%s", session_id)
 
 
+def _decode_source_metadata(value: str | dict[str, Any] | None) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except (ValueError, json.JSONDecodeError):
+            logger.warning("Ignoring malformed video source metadata")
+    return {}
+
+
 def _update_session_status(
     engine: Engine,
     session_id: str,
@@ -934,7 +985,7 @@ def recover_interrupted_sessions(
             rows = connection.execute(
                 text(
                     "SELECT s.id, s.status, s.created_at, s.analysis_fps, s.restart_count, "
-                    "src.source_type FROM sessions AS s LEFT JOIN sources AS src "
+                    "src.source_type, src.source_metadata FROM sessions AS s LEFT JOIN sources AS src "
                     "ON src.id=s.source_id WHERE s.status IN "
                     "('queued', 'processing', 'paused', 'stopping') "
                     "ORDER BY s.created_at ASC"
@@ -987,7 +1038,13 @@ def recover_interrupted_sessions(
                 resumed.append((state, candidates[0]))
             else:
                 result_path.unlink(missing_ok=True)
-                if (row["source_type"] or "video") != "video":
+                source_type = row["source_type"] or "video"
+                if source_type == "benchmark_video":
+                    error = (
+                        "Benchmark analysis was interrupted by an API restart. "
+                        "Start it again from the local benchmark library."
+                    )
+                elif source_type != "video":
                     error = (
                         "The live camera session ended when the API restarted. "
                         "Start the camera again."

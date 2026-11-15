@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "datasets": [
+    {
+      "id": "aicity-2021-track4",
+      "name": "AI City Challenge 2021 · Track 4",
+      "camera_view": "Fixed traffic cameras",
+      "source_url": "https://www.aicitychallenge.org/ai-city-challenge-dataset-access/",
+      "terms_url": "https://www.aicitychallenge.org/2021-faqs/",
+      "license_name": "Dataset-specific access agreement",
+      "purpose": "Roadside traffic clips with crash and stalled-vehicle anomaly labels.",
+      "limitation": "Reference labels mark incident onset; they do not establish reliable pre-impact prediction.",
+      "clips": []
+    },
+    {
+      "id": "nexar-collision-prediction",
+      "name": "Nexar Collision Prediction",
+      "camera_view": "Dashcam",
+      "source_url": "https://huggingface.co/datasets/nexar-ai/nexar_collision_prediction",
+      "terms_url": "https://huggingface.co/datasets/nexar-ai/nexar_collision_prediction/resolve/main/LICENSE",
+      "license_name": "Nexar Open Data License",
+      "purpose": "Collision and near-miss clips with event timing for studying warning lead time.",
+      "limitation": "Dashcam viewpoint differs from fixed roadside CCTV; attribution, privacy, and redistribution restrictions apply.",
+      "clips": []
+    },
+    {
+      "id": "bdd100k",
+      "name": "BDD100K",
+      "camera_view": "Driving video",
+      "source_url": "https://github.com/bdd100k/bdd100k/blob/master/doc/source/download.rst",
+      "terms_url": "https://doc.bdd100k.com/download.html",
+      "license_name": "Dataset-specific license",
+      "purpose": "General road-scene inputs for road-user and lane perception.",
+      "limitation": "Not an accident-anticipation dataset; the full video collection is very large (1.8 TB).",
+      "clips": []
+    }
+  ]
+}

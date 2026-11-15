@@ -27,7 +27,7 @@ def session_client(tmp_path: Path) -> tuple[TestClient, Path]:
     with engine.begin() as connection:
         connection.exec_driver_sql(
             "CREATE TABLE sources (id VARCHAR(36) PRIMARY KEY, source_type VARCHAR(32), "
-            "created_at DATETIME NOT NULL)"
+            "source_metadata TEXT, created_at DATETIME NOT NULL)"
         )
         connection.exec_driver_sql(
             "CREATE TABLE sessions (id VARCHAR(36) PRIMARY KEY, source_id VARCHAR(36), "
@@ -216,7 +216,7 @@ def test_recovery_requeues_interrupted_video_once_from_retained_upload(
     with engine.begin() as connection:
         connection.exec_driver_sql(
             "CREATE TABLE sources (id VARCHAR(36) PRIMARY KEY, source_type VARCHAR(32), "
-            "created_at DATETIME NOT NULL)"
+            "source_metadata TEXT, created_at DATETIME NOT NULL)"
         )
         connection.exec_driver_sql(
             "CREATE TABLE sessions (id VARCHAR(36) PRIMARY KEY, source_id VARCHAR(36), "

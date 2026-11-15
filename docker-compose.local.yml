@@ -1,6 +1,11 @@
 # Local host-port override for machines where another service uses port 8000.
 services:
   rodai-api:
+    environment:
+      RODAI_DATASET_LIBRARY_ENABLED: "true"
+      RODAI_DATASET_DIR: /var/lib/rodai/datasets
+    volumes:
+      - ./datasets:/var/lib/rodai/datasets:ro
     ports: !override
       - "8001:8000"
   rodai-frontend:

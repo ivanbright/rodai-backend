@@ -1,6 +1,6 @@
 # RodAI Product Vision
 
-Updated: 2026-11-14
+Updated: 2026-11-15
 
 ## Product goal
 
@@ -25,6 +25,7 @@ The top-down map, satellite/GPS overlays, vehicle-assistance displays, photoreal
 - A lightweight online tracker associates detections across nearby frames and estimates image-plane motion in pixels per second. It is a prototype association method; IDs can switch or split, and its pixel values are not calibrated vehicle speeds.
 - For a completed uploaded-video session, an operator can draw a virtual line across the road view. RodAI reports sampled tracked-ID crossings by direction and overlays the line during playback/export. Named line profiles can be saved in the current browser and reused on footage with a matching aspect ratio. Profiles contain image geometry only; they are not synced between users, do not identify or verify a physical camera, and do not calibrate speed. Counts remain exploratory and depend on sampled frames and unvalidated track identities.
 - One local smoke clip completed inference. This demonstrates that the pipeline runs; it does not demonstrate accuracy, reliable speed estimates, tracking quality, accident detection, collision prediction, CCTV streaming, or readiness for road deployment.
+- A local-only benchmark library lists AI City Challenge 2021 Track 4, Nexar Collision Prediction, and BDD100K as possible inputs. It analyzes only owner-registered local clips whose usage terms have been reviewed, preserves each clip's provenance and reference event label/time, and serves the source video read-only. No benchmark videos are bundled or downloaded automatically. Dataset event annotations are ground truth for review, not RodAI predictions. The benchmark sources have different viewpoints and rights; no imported clips or benchmark results are claimed yet.
 - The former scripted SVG simulation workspace has been removed from the frontend; it was a deterministic software demonstration, not real-video validation. Its historic details are retained in the Phase 4 handover.
 - The frontend now includes an experimental image-plane closest-approach heuristic: it highlights pairs of current tracks whose projected bounding boxes overlap within a three-second horizon. This uses noisy prototype IDs, sparse detections and uncalibrated pixel motion; it is not validated and may generate false or missed alerts. It is a review cue, not an accident prediction, prevention mechanism or safety decision.
 - The CCTV/RTSP ingest path, tracking validation, calibrated speed measurement, learned or validated conflict/incident logic, operator alert workflow, and representative Kigali/Rwanda evaluation are not yet implemented or accepted.
@@ -43,7 +44,7 @@ Each stage should use real recorded or live camera video where specified, retain
 
 ## Data and evaluation requirements
 
-Real sample footage is required before representative video acceptance. For each clip, record source/owner, capture date and location context, permission and permitted uses, camera/viewpoint, resolution, frame rate, duration, weather/light conditions, whether an incident is present, annotation status, privacy review and any transformations. Keep private by default and do not download or commit unverified road footage.
+Real sample footage is required before representative video acceptance. For each clip, record source/owner, capture date and location context, permission and permitted uses, camera/viewpoint, resolution, frame rate, duration, weather/light conditions, whether an incident is present, annotation status, privacy review and any transformations. Keep private by default and do not download or commit unverified road footage. Benchmark clips may be registered through the local library only after their terms and intended demonstration use have been reviewed.
 
 Split clips by source/camera/time and scenario before training or tuning to reduce leakage. Maintain separate training, tuning and held-out evaluation sets. Report model and configuration versions, class definitions, calibration, sample counts, metrics, failure cases and limitations for every benchmark. Synthetic or scripted data may support software tests but cannot replace representative recorded footage in acceptance claims.
 

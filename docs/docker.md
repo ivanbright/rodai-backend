@@ -6,7 +6,9 @@
 - `frontend`: Node 22 Vite dev server with hot reload.
 - `postgres`: PostgreSQL 17 for local/production engine parity.
 
-`docker compose up --build` starts the services: `rodai-db` for PostgreSQL, `rodai-api` for FastAPI, and `rodai-frontend` for Vite. Apply migrations as an explicit operation with `docker compose run --rm rodai-api alembic upgrade head`; app startup does not run migrations. Run tests with `scripts/run-tests.ps1`.
+`docker compose up --build` starts the services: `rodai-db` for PostgreSQL, `rodai-api` for FastAPI, and `rodai-frontend` for Vite. Apply migrations as an explicit operation before starting a new backend revision with `docker compose run --rm rodai-api alembic upgrade head`; app startup does not run migrations.
+
+The local override enables a local-only benchmark library and mounts the root `datasets/` directory read-only at `/var/lib/rodai/datasets`. The directory contains only a catalog and instructions in Git; downloaded videos remain ignored and are never copied into the image or persistent upload storage. Add clips only after reviewing their dataset terms and use the `rights_reviewed` catalog field to keep unreviewed inputs unavailable. The library setting is rejected outside the `local` environment. See [`../datasets/README.md`](../datasets/README.md).
 
 ## Image details
 

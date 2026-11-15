@@ -11,7 +11,9 @@ htmlcov/
 node_modules/
 dist/
 *.log
-datasets/
+datasets/**
+!datasets/catalog.json
+!datasets/README.md
 models/
 checkpoints/
 experiments/

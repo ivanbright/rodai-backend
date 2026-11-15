@@ -20,12 +20,16 @@ See [Product Vision](docs/PRODUCT_VISION.md) for the intended real-video product
 From the repository root, start the local stack:
 
 ```powershell
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d rodai-db
+docker compose -f docker-compose.yml -f docker-compose.local.yml run --build --rm rodai-api alembic upgrade head
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
 Open `http://localhost:5173` to process a local MP4, MOV, MKV, WebM or AVI. The latest saved video session reopens in the page with its annotated playback. The default is 2 analyzed frames per second; higher rates take longer on CPU and sparse sampling can miss fast events. Wait for the first analyzed frame before stopping. Export an annotated WebM only if you need a shareable file; the JSONL link is in **Technical data for developers**. The Compose override publishes the API on port 8001 because the default API host port may be occupied by another local service. API health is at `http://localhost:8001/api/v1/health`.
 
 The first video-analysis inference downloads and caches pinned model weights into the persistent `rodai_data` volume.
+
+The local **Benchmark library** lists official traffic datasets and can analyze clips that you have permission to use after you place them under the ignored `datasets/` folder and register them in [`datasets/catalog.json`](datasets/catalog.json). It streams the local source file read-only; no sample benchmark video is included or automatically downloaded. See [`datasets/README.md`](datasets/README.md) for the clip metadata format and terms-review gate. The library cannot be enabled in staging or production.
 
 Local Compose uses PostgreSQL and the Vite development proxy. In Railway, deploy the frontend and API as separate services; set the frontend's `VITE_API_BASE_URL` to the public API origin and allow the frontend origin in `RODAI_ALLOWED_ORIGINS`.
 
