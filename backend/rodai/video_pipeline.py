@@ -11,6 +11,7 @@ from typing import Any
 
 import cv2
 
+from rodai.risk import evaluate_trajectory_cues
 from rodai.tracking import RoadObjectTracker
 
 
@@ -116,6 +117,9 @@ def process_video(
                 if detect_frame
                 else []
             )
+            risk_cues = evaluate_trajectory_cues(
+                tracks, frame_id=frame_id, timestamp_ms=timestamp_ms
+            )
             analyzed_frames += 1
             if detect_frame and timestamp_ms is not None:
                 last_inference_timestamp_ms = timestamp_ms
@@ -130,6 +134,7 @@ def process_video(
                     "height": height,
                     "detections": detections,
                     "tracks": tracks,
+                    "risk_cues": risk_cues,
                     "inference": "complete" if detect_frame else "not-run",
                 }
             )

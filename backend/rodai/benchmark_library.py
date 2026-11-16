@@ -44,6 +44,7 @@ class BenchmarkClip(BaseModel):
     source_url: str
     license_name: str = Field(min_length=1, max_length=160)
     permitted_uses: str = Field(min_length=1, max_length=300)
+    creator_attribution: str | None = Field(default=None, max_length=240)
     privacy_reviewed: bool = False
     event_type: str = Field(default="unlabeled", min_length=1, max_length=64)
     event_time_seconds: float | None = Field(default=None, ge=0)
@@ -107,7 +108,7 @@ class BenchmarkDataset(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def unique_clip_ids(self) -> "BenchmarkDataset":
+    def unique_clip_ids(self) -> BenchmarkDataset:
         ids = [clip.id for clip in self.clips]
         if len(ids) != len(set(ids)):
             raise ValueError("Clip IDs must be unique within a dataset")
@@ -121,7 +122,7 @@ class BenchmarkCatalog(BaseModel):
     datasets: list[BenchmarkDataset] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
-    def unique_dataset_ids(self) -> "BenchmarkCatalog":
+    def unique_dataset_ids(self) -> BenchmarkCatalog:
         ids = [dataset.id for dataset in self.datasets]
         if len(ids) != len(set(ids)):
             raise ValueError("Dataset IDs must be unique")
@@ -198,6 +199,7 @@ def source_metadata(
         "source_url": clip.source_url,
         "license_name": clip.license_name,
         "permitted_uses": clip.permitted_uses,
+        "creator_attribution": clip.creator_attribution,
         "privacy_reviewed": clip.privacy_reviewed,
         "event_type": clip.event_type,
         "event_time_seconds": clip.event_time_seconds,

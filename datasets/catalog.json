@@ -33,6 +33,48 @@
       "purpose": "General road-scene inputs for road-user and lane perception.",
       "limitation": "Not an accident-anticipation dataset; the full video collection is very large (1.8 TB).",
       "clips": []
+    },
+    {
+      "id": "open-road-demo",
+      "name": "Open road-scene demos",
+      "camera_view": "Dashcam and elevated roadside; mixed views",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Dest-20220814_170517.ogv",
+      "terms_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "license_name": "Creator-declared CC0 1.0",
+      "purpose": "Short, rights-reviewed real footage for local perception and workflow demonstrations.",
+      "limitation": "Not a crash-prediction dataset or Rwanda/Kigali evaluation set. Event timing is unverified and privacy review is pending before external sharing.",
+      "clips": [
+        {
+          "id": "rainy-road-context",
+          "title": "Rainy road approach - context footage",
+          "file": "rainy-road-context.webm",
+          "rights_reviewed": true,
+          "source_url": "https://commons.wikimedia.org/wiki/File:Dest-20220814_170517.ogv",
+          "license_name": "Creator-declared CC0 1.0; 720p transcode",
+          "creator_attribution": "01x07x2022000",
+          "permitted_uses": "Local MVP playback and inference; privacy review before external sharing.",
+          "privacy_reviewed": false,
+          "event_type": "unlabeled_road_scene",
+          "event_time_seconds": null,
+          "annotation_reference": "The uploader's description mentions encountering an accident during the trip. This 15.3-second excerpt has no verified collision label or event timestamp; use it only as road-scene footage.",
+          "split": "demo-only"
+        },
+        {
+          "id": "berlin-night-traffic",
+          "title": "Berlin motorway - night traffic",
+          "file": "berlin-night-traffic.webm",
+          "rights_reviewed": true,
+          "source_url": "https://commons.wikimedia.org/wiki/File:Berlin_Bundesautobahn_100_2026-03-25_mov03.webm",
+          "license_name": "Creator-declared CC0 1.0",
+          "creator_attribution": "Lars Mueller",
+          "permitted_uses": "Local MVP playback and inference; privacy review before external sharing.",
+          "privacy_reviewed": false,
+          "event_type": "unlabeled_road_scene",
+          "event_time_seconds": null,
+          "annotation_reference": "11.2-second elevated motorway view at night. No incident annotation is supplied; use it as road-scene footage only.",
+          "split": "demo-only"
+        }
+      ]
     }
   ]
 }

@@ -36,6 +36,7 @@ from sqlalchemy import Engine, text
 from rodai.config import Settings
 from rodai.detector import get_detector
 from rodai.retention import register_artifact
+from rodai.risk import evaluate_trajectory_cues
 from rodai.tracking import RoadObjectTracker
 from rodai.video_pipeline import InvalidVideoError, write_jsonl_session
 
@@ -464,6 +465,9 @@ def make_sessions_router(
                     if detector
                     else []
                 )
+                risk_cues = evaluate_trajectory_cues(
+                    tracks, frame_id=frame_id, timestamp_ms=capture_time
+                )
                 frame_record = {
                     "schema_version": "rodai.session.v1",
                     "type": "frame",
@@ -478,6 +482,7 @@ def make_sessions_router(
                     "dropped_since_last": dropped,
                     "detections": detections,
                     "tracks": tracks,
+                    "risk_cues": risk_cues,
                     "inference": "complete" if detector else "not-run",
                 }
                 output.write(json.dumps(frame_record, separators=(",", ":")) + "\n")
@@ -511,6 +516,7 @@ def make_sessions_router(
                         "duration_ms": elapsed_ms,
                         "detections": detections,
                         "tracks": tracks,
+                        "risk_cues": risk_cues,
                         "inference": "complete" if detector else "not-run",
                     }
                 )
@@ -985,7 +991,8 @@ def recover_interrupted_sessions(
             rows = connection.execute(
                 text(
                     "SELECT s.id, s.status, s.created_at, s.analysis_fps, s.restart_count, "
-                    "src.source_type, src.source_metadata FROM sessions AS s LEFT JOIN sources AS src "
+                    "src.source_type, src.source_metadata FROM sessions AS s "
+                    "LEFT JOIN sources AS src "
                     "ON src.id=s.source_id WHERE s.status IN "
                     "('queued', 'processing', 'paused', 'stopping') "
                     "ORDER BY s.created_at ASC"
